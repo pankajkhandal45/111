@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Chess Platform"
+version = "1.0.0"
+id = "artifacts/chess-platform"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23109
+
+[services.development]
+run = "pnpm --filter @workspace/chess-platform run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/chess-platform", "run", "build" ]
+publicDir = "artifacts/chess-platform/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23109"
+BASE_PATH = "/"

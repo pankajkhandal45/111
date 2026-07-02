@@ -1,0 +1,391 @@
+Create a fully professional, premium-quality Chess platform inspired by Chess.com with modern UI, smooth animations, and excellent performance. The application must work perfectly on desktop, tablet, and mobile devices. Keep the design elegant with dark and light themes, glassmorphism elements, subtle animations, and a polished user experience.
+
+========================
+CORE FEATURES
+========================
+
+Build a complete chess platform with the following game modes:
+
+1. Online Multiplayer
+- Real-time multiplayer using WebSocket (Socket.io).
+- Create private rooms with room code.
+- Invite friends through link sharing.
+- Matchmaking system for public games.
+- Spectator mode.
+- Reconnection after internet interruption.
+- Game synchronization without delays.
+- Chat system during games.
+- Emojis and quick reactions.
+
+2. Offline Local Multiplayer
+- Two players can play on the same device.
+- Board rotates automatically after every move.
+- Move history panel.
+- Undo option.
+- Restart game option.
+
+3. Computer (Bot) Mode
+- Multiple AI levels similar to Chess.com:
+  - Beginner
+  - Easy
+  - Intermediate
+  - Advanced
+  - Expert
+  - Master
+  - Grandmaster
+- Use Stockfish engine integration.
+- Adjustable thinking time.
+- Hint system.
+- Best move suggestions.
+- Analysis mode.
+- Show evaluation bar.
+- Move classifications:
+  - Brilliant
+  - Great
+  - Best
+  - Excellent
+  - Good
+  - Inaccuracy
+  - Mistake
+  - Blunder
+
+========================
+CHESS RULES
+========================
+
+Implement complete FIDE chess rules:
+
+- Legal move validation.
+- Check and checkmate detection.
+- Stalemate.
+- Castling.
+- En passant.
+- Pawn promotion.
+- Draw by repetition.
+- Fifty-move rule.
+- Insufficient material.
+- Resignation.
+- Offer draw.
+- Timer expiration.
+- PGN generation.
+- FEN support.
+
+========================
+BOARD FEATURES
+========================
+
+- Beautiful animated chess board.
+- Multiple board themes.
+- Multiple piece styles.
+- Smooth piece movement animations.
+- Drag-and-drop movement.
+- Click-to-move support.
+- Highlight legal moves.
+- Last move highlighting.
+- Check highlighting.
+- Coordinates around board.
+- Flip board option.
+- Full-screen mode.
+- Zoom support.
+
+========================
+CLOCK SYSTEM
+========================
+
+Support various time controls:
+
+Bullet
+- 1 min
+- 2 min
+
+Blitz
+- 3 min
+- 5 min
+
+Rapid
+- 10 min
+- 15 min
+- 30 min
+
+Classical
+- 60 min
+
+Custom timer settings:
+- Initial time
+- Increment time
+- Delay time
+
+========================
+ACCOUNT SYSTEM
+========================
+
+Authentication:
+- Email/password login
+- Google login
+- Guest mode
+- Forgot password
+- Email verification
+
+Profile System:
+- Username
+- Avatar upload
+- Country flag
+- Rating
+- Bio
+- Statistics
+- Win percentage
+
+========================
+RATING SYSTEM
+========================
+
+ELO rating system similar to Chess.com:
+
+Separate ratings for:
+- Bullet
+- Blitz
+- Rapid
+- Classical
+
+Player statistics:
+- Wins
+- Losses
+- Draws
+- Accuracy percentage
+- Average centipawn loss
+- Total games
+- Win streak
+- Best rating achieved
+
+========================
+GAME ANALYSIS
+========================
+
+After every game provide:
+
+- Accuracy score.
+- Evaluation graph.
+- Engine analysis.
+- Mistakes and blunders.
+- Best moves.
+- Missed wins.
+- Move-by-move review.
+- Opening identification.
+- Endgame analysis.
+- Download PGN.
+- Copy PGN.
+- Share game.
+
+========================
+OPENING EXPLORER
+========================
+
+- Detect opening names.
+- ECO codes.
+- Opening database.
+- Most common moves.
+- Win percentages.
+- Opening explorer interface.
+
+========================
+PUZZLES
+========================
+
+Puzzle mode like Chess.com:
+
+- Mate in 1
+- Mate in 2
+- Mate in 3
+- Tactical puzzles
+- Endgame puzzles
+- Puzzle ratings
+- Puzzle streak system
+- Daily puzzles
+
+========================
+LEADERBOARD
+========================
+
+Global rankings.
+Friends leaderboard.
+Country rankings.
+Highest rating players.
+Monthly rankings.
+
+========================
+SOCIAL FEATURES
+========================
+
+- Add friends.
+- Friend requests.
+- Follow players.
+- Online status.
+- Recently played opponents.
+- Challenge friends directly.
+- Game invitations.
+- Notifications.
+- Messaging system.
+
+========================
+MATCH HISTORY
+========================
+
+Store complete history:
+
+- Date and time.
+- Opponent.
+- Result.
+- Time control.
+- Accuracy.
+- PGN file.
+- Download game.
+- Replay board.
+
+========================
+REPLAY SYSTEM
+========================
+
+- Previous move.
+- Next move.
+- First move.
+- Last move.
+- Auto-play replay.
+- Speed controls.
+- Engine evaluation.
+
+========================
+ADMIN PANEL
+========================
+
+Professional admin dashboard:
+
+Users Management
+- Ban users.
+- Suspend users.
+- Delete accounts.
+- Search users.
+
+Game Management
+- View active games.
+- Monitor servers.
+- Logs.
+- Reports.
+
+Statistics
+- Daily users.
+- Active games.
+- Online players.
+- Ratings distribution.
+
+Content Management
+- Puzzle management.
+- Announcements.
+- News section.
+
+========================
+DATABASE
+========================
+
+Use PostgreSQL.
+
+Tables:
+- Users
+- Profiles
+- Games
+- Moves
+- Ratings
+- Friends
+- FriendRequests
+- Messages
+- Notifications
+- Puzzles
+- Leaderboards
+- Reports
+
+========================
+BACKEND
+========================
+
+Node.js + Express.js
+
+Libraries:
+- chess.js
+- Socket.io
+- Stockfish
+- JWT Authentication
+- bcrypt
+- Prisma ORM
+
+========================
+FRONTEND
+========================
+
+React + TypeScript + Vite
+
+UI:
+- Tailwind CSS
+- Framer Motion animations
+- Responsive design
+- Dark/Light mode
+- Glassmorphism style
+- Smooth transitions
+
+========================
+EXTRA PREMIUM FEATURES
+========================
+
+- Daily challenges.
+- Achievement system.
+- Badges.
+- XP and leveling system.
+- Sound effects.
+- Move animations.
+- Confetti on victory.
+- Theme customization.
+- Board customization.
+- Piece customization.
+- Background music toggle.
+- Keyboard shortcuts.
+- Accessibility support.
+- PWA support.
+- Offline mode.
+- Multi-language support.
+- English and Hindi.
+- Notifications.
+- Progressive loading.
+- Lazy loading.
+- High performance and SEO optimized.
+
+========================
+DEPLOYMENT
+========================
+
+Frontend:
+Vercel
+
+Backend:
+Render
+
+Database:
+PostgreSQL (Neon/Supabase)
+
+========================
+CODE REQUIREMENTS
+========================
+
+- Clean architecture.
+- Modular folder structure.
+- TypeScript everywhere.
+- Reusable components.
+- Secure APIs.
+- Input validation.
+- Error handling.
+- Loading states.
+- Skeleton screens.
+- Optimized performance.
+- Production-ready code.
+- Professional comments.
+- No dummy functions.
+- All features fully working.
+
+The final application should look and feel like a premium Chess.com alternative with a modern interface, smooth animations, powerful Stockfish AI, online multiplayer with friends, local multiplayer on one device, game analysis, puzzles, leaderboards, and complete chess functionality.
