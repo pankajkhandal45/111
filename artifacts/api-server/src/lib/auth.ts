@@ -25,11 +25,18 @@ export interface AuthRequest extends Request {
 
 export async function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith("Bearer ")) {
+  // EventSource (SSE) cannot send custom headers, so also allow token via query param
+  let token: string | undefined;
+  if (authHeader?.startsWith("Bearer ")) {
+    token = authHeader.slice(7);
+  } else if (typeof req.query.token === "string" && req.query.token) {
+    token = req.query.token;
+  }
+
+  if (!token) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  const token = authHeader.slice(7);
   const payload = verifyToken(token);
   if (!payload) {
     res.status(401).json({ error: "Invalid token" });
@@ -44,6 +51,7 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
   req.user = user;
   next();
 }
+
 
 export async function optionalAuth(req: AuthRequest, _res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;

@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import { db } from "@workspace/db";
 import { gamesTable, movesTable, usersTable, ratingsTable } from "@workspace/db";
 import { eq, and, or, desc } from "drizzle-orm";
@@ -6,6 +6,30 @@ import { requireAuth, type AuthRequest } from "../lib/auth";
 import { formatGameSummary } from "./users";
 
 const router = Router();
+
+// ─── SSE Registry ────────────────────────────────────────────────────────────
+// Maps gameId → Set of SSE response objects (one per connected client)
+const sseClients = new Map<number, Set<Response>>();
+
+function addSseClient(gameId: number, res: Response) {
+  if (!sseClients.has(gameId)) sseClients.set(gameId, new Set());
+  sseClients.get(gameId)!.add(res);
+}
+
+function removeSseClient(gameId: number, res: Response) {
+  sseClients.get(gameId)?.delete(res);
+  if (sseClients.get(gameId)?.size === 0) sseClients.delete(gameId);
+}
+
+function pushGameUpdate(gameId: number, gameData: unknown) {
+  const clients = sseClients.get(gameId);
+  if (!clients || clients.size === 0) return;
+  const payload = `data: ${JSON.stringify(gameData)}\n\n`;
+  for (const client of clients) {
+    try { client.write(payload); } catch { /* client already disconnected */ }
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 const TIME_CONTROL_MS: Record<string, number> = {
   bullet1: 60000,
@@ -123,7 +147,10 @@ router.post("/games/join", requireAuth, async (req: AuthRequest, res) => {
       updatedAt: new Date(),
     }).where(eq(gamesTable.id, game.id));
 
-    res.json(await getFullGame(game.id));
+    const updatedGame = await getFullGame(game.id);
+    // Push SSE update to host (Player 1) who is on the waiting screen
+    pushGameUpdate(game.id, updatedGame);
+    res.json(updatedGame);
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Failed to join game" });
@@ -170,6 +197,37 @@ router.get("/games/:id", requireAuth, async (req: AuthRequest, res) => {
     req.log.error(err);
     res.status(500).json({ error: "Failed to get game" });
   }
+});
+
+// GET /api/games/:id/events — SSE stream for real-time game updates
+router.get("/games/:id/events", requireAuth, async (req: AuthRequest, res) => {
+  const gameId = parseInt(req.params.id);
+  if (isNaN(gameId)) { res.status(400).end(); return; }
+
+  // SSE headers
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no"); // disable nginx buffering if present
+  res.flushHeaders();
+
+  // Send a keep-alive comment every 25 seconds to prevent proxy timeouts
+  const keepAlive = setInterval(() => {
+    try { res.write(": ping\n\n"); } catch { /* ignore */ }
+  }, 25000);
+
+  addSseClient(gameId, res);
+
+  // Send initial game state immediately so client is up to date on connect
+  try {
+    const game = await getFullGame(gameId);
+    if (game) res.write(`data: ${JSON.stringify(game)}\n\n`);
+  } catch { /* ignore */ }
+
+  req.on("close", () => {
+    clearInterval(keepAlive);
+    removeSseClient(gameId, res);
+  });
 });
 
 // POST /api/games/:id/move
@@ -247,7 +305,10 @@ router.post("/games/:id/move", requireAuth, async (req: AuthRequest, res) => {
       await computeBotMove(id, newPgn, newFen, game.botLevel || "easy");
     }
 
-    res.json(await getFullGame(id));
+    const updatedGame = await getFullGame(id);
+    // Push real-time update to all SSE subscribers of this game
+    pushGameUpdate(id, updatedGame);
+    res.json(updatedGame);
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Failed to make move" });
@@ -269,7 +330,9 @@ router.post("/games/:id/resign", requireAuth, async (req: AuthRequest, res) => {
       updatedAt: new Date(),
     }).where(eq(gamesTable.id, id));
 
-    res.json(await getFullGame(id));
+    const updatedGame = await getFullGame(id);
+    pushGameUpdate(id, updatedGame);
+    res.json(updatedGame);
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Failed to resign" });
@@ -287,7 +350,9 @@ router.post("/games/:id/draw", requireAuth, async (req: AuthRequest, res) => {
       updatedAt: new Date(),
     }).where(eq(gamesTable.id, id));
 
-    res.json(await getFullGame(id));
+    const updatedGame = await getFullGame(id);
+    pushGameUpdate(id, updatedGame);
+    res.json(updatedGame);
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Failed to offer draw" });
@@ -361,6 +426,13 @@ async function getFullGame(id: number) {
     roomCode: game.roomCode ?? null,
     createdAt: game.createdAt,
     updatedAt: game.updatedAt,
+    // ✅ Player info for display (names + avatars)
+    whitePlayer: game.whitePlayer
+      ? { id: game.whitePlayer.id, username: game.whitePlayer.username, avatar: game.whitePlayer.avatar ?? null }
+      : null,
+    blackPlayer: game.blackPlayer
+      ? { id: game.blackPlayer.id, username: game.blackPlayer.username, avatar: game.blackPlayer.avatar ?? null }
+      : null,
     moves: game.moves.map((m) => ({
       id: m.id,
       gameId: m.gameId,

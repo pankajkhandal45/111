@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useLocation } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, User, Lock, Globe, Trash2 } from 'lucide-react';
+import { Loader2, User, Lock, Globe, Trash2, Upload, X } from 'lucide-react';
 
 export default function Settings() {
   const { user, logout, isLoading: isAuthLoading } = useAuth();
@@ -17,6 +17,8 @@ export default function Settings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const token = localStorage.getItem('chess_token');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const [profileForm, setProfileForm] = useState({
     username: '',
@@ -79,6 +81,45 @@ export default function Settings() {
       toast({ title: err.message, variant: 'destructive' });
     } finally {
       setIsSavingProfile(false);
+    }
+  }
+
+  // Convert local image file → base64 and save immediately
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Sirf image files allowed hain', variant: 'destructive' });
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: 'Image 2MB se chhoti honi chahiye', variant: 'destructive' });
+      return;
+    }
+    setIsUploadingImage(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      // Update local preview immediately
+      setProfileForm(f => ({ ...f, avatar: base64 }));
+      // Save to server right away
+      const res = await fetch('/api/users/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ avatar: base64 }),
+      });
+      if (!res.ok) throw new Error('Upload failed');
+      queryClient.invalidateQueries({ queryKey: ['me'] });
+      toast({ title: '✅ Profile photo update ho gayi!' });
+    } catch (err: any) {
+      toast({ title: err.message || 'Upload failed', variant: 'destructive' });
+    } finally {
+      setIsUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   }
 
@@ -148,20 +189,75 @@ export default function Settings() {
         </CardHeader>
         <CardContent>
           <form onSubmit={saveProfile} className="space-y-5">
-            {/* Avatar Preview */}
-            <div className="flex items-center gap-4">
-              <Avatar className="h-16 w-16">
-                <AvatarImage src={profileForm.avatar || undefined} alt={user.username} />
-                <AvatarFallback className="text-xl">{user.username.substring(0, 2).toUpperCase()}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1 space-y-1">
-                <Label htmlFor="avatar">Avatar URL</Label>
-                <Input
-                  id="avatar"
-                  placeholder="https://example.com/avatar.jpg"
-                  value={profileForm.avatar}
-                  onChange={e => setProfileForm(f => ({ ...f, avatar: e.target.value }))}
+            {/* Avatar Upload Section */}
+            <div className="flex items-start gap-4">
+              {/* Avatar Preview with upload overlay */}
+              <div className="relative group flex-shrink-0">
+                <Avatar className="h-20 w-20 border-2 border-muted">
+                  <AvatarImage src={profileForm.avatar || undefined} alt={user.username} />
+                  <AvatarFallback className="text-2xl font-bold">
+                    {user.username.substring(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                {/* Hover overlay */}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingImage}
+                  className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                >
+                  {isUploadingImage
+                    ? <Loader2 className="h-5 w-5 text-white animate-spin" />
+                    : <Upload className="h-5 w-5 text-white" />}
+                </button>
+                {/* Hidden file input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageUpload}
                 />
+              </div>
+
+              <div className="flex-1 space-y-2">
+                <div>
+                  <p className="text-sm font-medium">Profile Photo</p>
+                  <p className="text-xs text-muted-foreground">Photo par click karke local image upload karo (max 2MB)</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingImage}
+                  className="w-full"
+                >
+                  {isUploadingImage
+                    ? <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Uploading...</>
+                    : <><Upload className="mr-2 h-3 w-3" />Device se photo choose karo</>}
+                </Button>
+                {/* Optional: manual URL override */}
+                {profileForm.avatar && !profileForm.avatar.startsWith('data:') && (
+                  <div className="flex items-center gap-1">
+                    <Input
+                      placeholder="Ya avatar URL paste karo"
+                      value={profileForm.avatar}
+                      onChange={e => setProfileForm(f => ({ ...f, avatar: e.target.value }))}
+                      className="text-xs h-7"
+                    />
+                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0"
+                      onClick={() => setProfileForm(f => ({ ...f, avatar: '' }))}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+                {profileForm.avatar && (
+                  <Button type="button" variant="ghost" size="sm" className="text-xs text-muted-foreground h-6 px-2"
+                    onClick={() => setProfileForm(f => ({ ...f, avatar: '' }))}>
+                    <X className="h-3 w-3 mr-1" /> Photo hatao
+                  </Button>
+                )}
               </div>
             </div>
 
