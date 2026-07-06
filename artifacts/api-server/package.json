@@ -8,7 +8,7 @@
     "build": "node ./build.mjs",
     "start": "pnpm run push && node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "push": "pnpm --filter @workspace/db push"
+    "push": "pnpm --filter @workspace/db push-force"
   },
   "dependencies": {
     "@workspace/api-zod": "workspace:*",
