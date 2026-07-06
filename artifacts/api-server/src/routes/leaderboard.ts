@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { usersTable, ratingsTable, gamesTable } from "@workspace/db";
-import { eq, or, desc, and } from "drizzle-orm";
+import { eq, or, desc, and, like } from "drizzle-orm";
 
 const router = Router();
 
@@ -33,7 +33,8 @@ router.get("/leaderboard", async (req, res) => {
       const games = await db.select().from(gamesTable).where(
         and(
           or(eq(gamesTable.whitePlayerId, u.id), eq(gamesTable.blackPlayerId, u.id)),
-          eq(gamesTable.status, "finished")
+          eq(gamesTable.status, "finished"),
+          like(gamesTable.timeControl, `${timeControl}%`)
         )
       ).limit(100);
 

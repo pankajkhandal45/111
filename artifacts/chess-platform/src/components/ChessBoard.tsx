@@ -9,6 +9,7 @@ interface ChessBoardProps {
   legalMoves?: string[];
   lastMove?: { from: string; to: string };
   disabled?: boolean;
+  rotateTopPieces?: boolean;
 }
 
 const PIECE_SYMBOLS: Record<Color, Record<PieceSymbol, string>> = {
@@ -21,7 +22,7 @@ const RANKS = ['8', '7', '6', '5', '4', '3', '2', '1'];
 
 const DEFAULT_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-export function ChessBoard({ fen, onMove, flipped = false, lastMove, disabled = false }: ChessBoardProps) {
+export function ChessBoard({ fen, onMove, flipped = false, lastMove, disabled = false, rotateTopPieces = false }: ChessBoardProps) {
   const [chess, setChess] = useState(() => {
     const c = new Chess();
     if (fen && fen.trim()) {
@@ -173,7 +174,8 @@ export function ChessBoard({ fen, onMove, flipped = false, lastMove, disabled = 
                     className={cn(
                       "relative z-20 text-[2.5rem] sm:text-[4rem] leading-none filter drop-shadow-sm transition-transform duration-150 ease-in-out cursor-pointer",
                       piece.color === 'w' ? "text-white" : "text-black",
-                      "drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]"
+                      "drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]",
+                      rotateTopPieces && piece.color === (flipped ? 'w' : 'b') ? "rotate-180" : ""
                     )}
                   >
                     {PIECE_SYMBOLS[piece.color][piece.type]}

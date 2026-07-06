@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/context/AuthContext';
 import { useGetNotifications } from '@workspace/api-client-react';
 import { useOnlineFriends } from '@/hooks/useOnlineFriends';
-import { Bell, Menu, User, Settings, LogOut, ShieldCheck, Users } from 'lucide-react';
+import { useTheme } from '@/components/ThemeProvider';
+import { Bell, User, Settings, LogOut, ShieldCheck, Users, Sun, Moon, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -15,11 +16,35 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 export function NavBar() {
   const { user, logout } = useAuth();
   const [, setLocation] = useLocation();
+  const { theme, setTheme } = useTheme();
+  
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setInstallPrompt(null);
+    }
+  };
 
   const { data: notifications } = useGetNotifications({
     query: { enabled: !!user }
@@ -67,6 +92,12 @@ export function NavBar() {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-4">
+          <Button variant="ghost" size="icon" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+            <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            <span className="sr-only">Toggle theme</span>
+          </Button>
+
           {user ? (
             <>
               <Button variant="ghost" size="icon" className="relative">
@@ -140,6 +171,12 @@ export function NavBar() {
                       <span>Settings</span>
                     </Link>
                   </DropdownMenuItem>
+                  {installPrompt && (
+                    <DropdownMenuItem onClick={handleInstallClick} className="cursor-pointer w-full flex items-center">
+                      <Download className="mr-2 h-4 w-4" />
+                      <span>Install App</span>
+                    </DropdownMenuItem>
+                  )}
                   {user.role === 'admin' && (
                     <>
                       <DropdownMenuSeparator />
@@ -173,26 +210,7 @@ export function NavBar() {
             </div>
           )}
 
-          {/* Mobile Menu */}
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden">
-                <Menu className="h-5 w-5" />
-                <span className="sr-only">Toggle menu</span>
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-[240px] sm:w-[300px]">
-              <div className="flex flex-col gap-6 mt-6">
-                <Link href="/" className="flex items-center gap-2 mb-4">
-                  <span className="text-2xl text-primary">♔</span>
-                  <span className="font-bold text-lg">ChessHub</span>
-                </Link>
-                <div className="flex flex-col gap-4">
-                  <NavLinks />
-                </div>
-              </div>
-            </SheetContent>
-          </Sheet>
+
         </div>
       </div>
     </header>

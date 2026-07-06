@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
+import { VitePWA } from "vite-plugin-pwa";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
 const rawPort = process.env.PORT || "5173";
@@ -20,6 +21,28 @@ export default defineConfig({
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['image.png'],
+      manifest: {
+        name: 'ChessHub',
+        short_name: 'ChessHub',
+        description: 'Play Chess Online',
+        theme_color: '#ffffff',
+        icons: [
+          {
+            src: 'image.png',
+            sizes: '192x192',
+            type: 'image/png'
+          },
+          {
+            src: 'image.png',
+            sizes: '512x512',
+            type: 'image/png'
+          }
+        ]
+      }
+    }),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [

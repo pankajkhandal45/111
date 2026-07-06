@@ -8,7 +8,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/context/AuthContext';
-import { Loader2, Flag, Handshake, Home, Trophy, Minus } from 'lucide-react';
+import { Loader2, Flag, Handshake, Home, Trophy, Minus, ArrowUpDown } from 'lucide-react';
 import { Chess } from 'chess.js';
 
 // ── Game Over Modal ───────────────────────────────────────────────────────────
@@ -94,7 +94,7 @@ function GameOverModal({ game, currentUserId, onClose }: {
         {/* Headline */}
         <div className="text-center">
           <h2 className="text-2xl font-extrabold tracking-tight">
-            {isDraw ? '🤝 Draw!' : isMeWinner ? '🎉 Aap Jeete!' : '😔 Aap Hare!'}
+            {isDraw ? '🤝 Draw!' : isMeWinner ? '🎉 You Win!' : '😔 You Lose!'}
           </h2>
           <p className="text-muted-foreground text-xs mt-1">{reason}</p>
         </div>
@@ -124,10 +124,10 @@ function GameOverModal({ game, currentUserId, onClose }: {
         {/* Actions */}
         <div className="flex flex-col gap-2 w-full">
           <Button className="w-full" onClick={() => setLocation('/')}>
-            <Home className="w-4 h-4 mr-2" /> Home par jaao
+            <Home className="w-4 h-4 mr-2" /> Home
           </Button>
           <Button variant="outline" className="w-full" onClick={onClose}>
-            Board dekhna jaari rakho
+            Analyse Board
           </Button>
         </div>
       </div>
@@ -155,13 +155,13 @@ function ResignConfirmDialog({ onConfirm, onCancel, isPending }: {
         style={{ animation: 'fadeInScale .2s ease' }}>
         <div className="text-center">
           <Flag className="w-10 h-10 text-destructive mx-auto mb-2" />
-          <h3 className="text-lg font-bold">Resign karna chahte ho?</h3>
-          <p className="text-muted-foreground text-sm mt-1">Resign karne par aap hare maane jaoge.</p>
+          <h3 className="text-lg font-bold">Resign?</h3>
+          <p className="text-muted-foreground text-sm mt-1">Resigning will result in a loss.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" className="flex-1" onClick={onCancel} disabled={isPending}>Nahi</Button>
+          <Button variant="outline" className="flex-1" onClick={onCancel} disabled={isPending}>No</Button>
           <Button variant="destructive" className="flex-1" onClick={onConfirm} disabled={isPending}>
-            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Haan, Resign'}
+            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Yes, Resign'}
           </Button>
         </div>
       </div>
@@ -179,6 +179,7 @@ export default function Game() {
   const sseRef = useRef<EventSource | null>(null);
   const [showGameOver, setShowGameOver] = useState(false);
   const [showResignConfirm, setShowResignConfirm] = useState(false);
+  const [rotatePieces, setRotatePieces] = useState(false);
   const prevStatusRef = useRef<string | undefined>(undefined);
 
   // Polling as fallback only — SSE handles real-time updates
@@ -287,9 +288,10 @@ export default function Game() {
 
   const isWhite = user?.id === game.whitePlayerId;
   const isBlack = user?.id === game.blackPlayerId;
+  const isLocal = game.mode === 'local';
   const isPlaying = isWhite || isBlack;
   const playerColor = isWhite ? 'white' : 'black';
-  const myTurn = (chess.turn() === 'w' && isWhite) || (chess.turn() === 'b' && isBlack);
+  const myTurn = (chess.turn() === 'w' && isWhite) || (chess.turn() === 'b' && isBlack) || isLocal;
 
   const handleMove = (from: string, to: string, promotion?: string) => {
     if (!myTurn || game.status !== 'active') return;
@@ -321,7 +323,8 @@ export default function Game() {
     }
   };
 
-  const flipped = isBlack;
+  // For local play, randomize who gets White (who moves first) based on the game ID.
+  const flipped = isLocal ? (game.id % 2 === 1) : isBlack;
   const bottomColor = flipped ? 'black' : 'white';
   const topColor = flipped ? 'white' : 'black';
   const bottomTime = flipped ? (game.blackTimeMs || 0) : (game.whiteTimeMs || 0);
@@ -331,8 +334,19 @@ export default function Game() {
   const isTopTurn = game.status === 'active' && chess.turn() === topColor.charAt(0);
 
   // Derive player objects for display (top = opponent, bottom = me)
-  const whitePlayer = (game as any).whitePlayer;
-  const blackPlayer = (game as any).blackPlayer;
+  const whitePlayer = { ...(game as any).whitePlayer };
+  const blackPlayer = { ...(game as any).blackPlayer };
+  
+  if (isLocal) {
+    if (flipped) {
+      whitePlayer.username = 'Player 2';
+      whitePlayer.avatar = null;
+    } else {
+      blackPlayer.username = 'Player 2';
+      blackPlayer.avatar = null;
+    }
+  }
+
   const bottomPlayer = flipped ? blackPlayer : whitePlayer;
   const topPlayer    = flipped ? whitePlayer : blackPlayer;
 
@@ -420,6 +434,7 @@ export default function Game() {
           flipped={flipped}
           disabled={!myTurn || game.status !== 'active'}
           lastMove={lastMove}
+          rotateTopPieces={isLocal && rotatePieces}
         />
 
         {/* Player Info & Clock */}
@@ -439,24 +454,35 @@ export default function Game() {
         </div>
 
         {game.status === 'active' && isPlaying && (
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => offerDraw.mutate({ id: gameId }, {
-                onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetGameQueryKey(gameId) })
-              })}
-              disabled={offerDraw.isPending}
-            >
-              <Handshake className="w-4 h-4 mr-2" /> Draw
-            </Button>
-            <Button
-              variant="destructive"
-              className="flex-1"
-              onClick={() => setShowResignConfirm(true)}
-            >
-              <Flag className="w-4 h-4 mr-2" /> Resign
-            </Button>
+          <div className="flex flex-col gap-2">
+            {isLocal && (
+              <Button
+                variant="secondary"
+                className="w-full"
+                onClick={() => setRotatePieces(!rotatePieces)}
+              >
+                <ArrowUpDown className="w-4 h-4 mr-2" /> Rotate Opponent Pieces
+              </Button>
+            )}
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => offerDraw.mutate({ id: gameId }, {
+                  onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetGameQueryKey(gameId) })
+                })}
+                disabled={offerDraw.isPending}
+              >
+                <Handshake className="w-4 h-4 mr-2" /> Draw
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={() => setShowResignConfirm(true)}
+              >
+                <Flag className="w-4 h-4 mr-2" /> Resign
+              </Button>
+            </div>
           </div>
         )}
 

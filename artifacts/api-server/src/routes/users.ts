@@ -183,7 +183,24 @@ router.patch("/users/me/password", requireAuth, async (req: AuthRequest, res) =>
 // DELETE /api/users/me
 router.delete("/users/me", requireAuth, async (req: AuthRequest, res) => {
   try {
-    await db.delete(usersTable).where(eq(usersTable.id, req.userId!));
+    const userId = req.userId!;
+
+    // SQLite doesn't always enforce FK cascades — delete in correct dependency order
+    // 1. Delete all games involving this user (since whitePlayerId cannot be null)
+    await db.delete(gamesTable)
+      .where(or(
+        eq(gamesTable.whitePlayerId, userId),
+        eq(gamesTable.blackPlayerId, userId)
+      ));
+
+    // 2. Delete tables that reference userId with cascade (handled by schema)
+    //    friendRequestsTable, friendsTable, notificationsTable, ratingsTable
+    //    all have onDelete:"cascade" so they'll auto-delete with the user.
+    //    puzzleStreaksTable also has cascade.
+
+    // 3. Delete the user — cascades will clean up the rest
+    await db.delete(usersTable).where(eq(usersTable.id, userId));
+
     res.json({ success: true });
   } catch (err) {
     req.log.error(err);
@@ -196,9 +213,10 @@ router.get("/dashboard", requireAuth, async (req: AuthRequest, res) => {
   try {
     const userId = req.userId!;
     const [rating] = await db.select().from(ratingsTable).where(eq(ratingsTable.userId, userId)).limit(1);
+    // Always show actual rating; if no row yet, default is 800 (matches DB default)
     const ratings = rating
-      ? { bullet: rating.bullet, blitz: rating.blitz, rapid: rating.rapid, classical: rating.classical }
-      : { bullet: 800, blitz: 800, rapid: 800, classical: 800 };
+      ? { bullet: rating.bullet, blitz: rating.blitz, rapid: rating.rapid, classical: rating.classical, puzzleRating: rating.puzzleRating }
+      : { bullet: 800, blitz: 800, rapid: 800, classical: 800, puzzleRating: 800 };
 
     // Recent games
     const recentGames = await db.query.gamesTable.findMany({

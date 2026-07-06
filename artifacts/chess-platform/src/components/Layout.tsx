@@ -1,5 +1,6 @@
 import React from 'react';
 import { NavBar } from './NavBar';
+import { BottomNav } from './BottomNav';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'wouter';
 import { useHeartbeat } from '@/hooks/useHeartbeat';
@@ -9,7 +10,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   useHeartbeat();
 
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-background text-foreground font-sans">
+    <div className="min-h-[100dvh] flex flex-col bg-background text-foreground font-sans pb-16 md:pb-0">
       <NavBar />
       <main className="flex-1 w-full max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
         <AnimatePresence mode="wait">
@@ -25,6 +26,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </motion.div>
         </AnimatePresence>
       </main>
+      <BottomNav />
     </div>
   );
 }

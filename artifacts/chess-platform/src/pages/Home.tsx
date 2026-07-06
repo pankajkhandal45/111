@@ -71,7 +71,7 @@ export default function Home() {
             <Trophy className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboard?.ratings?.rapid || 1200}</div>
+            <div className="text-2xl font-bold">{dashboard?.ratings?.rapid ?? 800}</div>
           </CardContent>
         </Card>
         <Card>
@@ -80,7 +80,7 @@ export default function Home() {
             <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboard?.ratings?.blitz || 1200}</div>
+            <div className="text-2xl font-bold">{dashboard?.ratings?.blitz ?? 800}</div>
           </CardContent>
         </Card>
         <Card>
@@ -89,7 +89,7 @@ export default function Home() {
             <Trophy className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboard?.ratings?.bullet || 1200}</div>
+            <div className="text-2xl font-bold">{dashboard?.ratings?.bullet ?? 800}</div>
           </CardContent>
         </Card>
         <Card>
