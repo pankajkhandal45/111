@@ -18,7 +18,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 
 export function NavBar() {
-  const { user, logout } = useAuth();
+  const { user, logout, isLoading } = useAuth();
   const [, setLocation] = useLocation();
   const { theme, setTheme } = useTheme();
   
@@ -199,6 +199,11 @@ export function NavBar() {
                 </DropdownMenuContent>
               </DropdownMenu>
             </>
+          ) : isLoading ? (
+            <div className="flex items-center gap-2">
+              <div className="h-10 w-16 bg-muted/50 rounded-md animate-pulse"></div>
+              <div className="h-10 w-20 bg-muted/50 rounded-md animate-pulse"></div>
+            </div>
           ) : (
             <div className="flex items-center gap-2">
               <Button variant="ghost" asChild>
