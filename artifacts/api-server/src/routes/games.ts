@@ -90,11 +90,18 @@ router.post("/games", requireAuth, async (req: AuthRequest, res) => {
 
     // For bot/local games assign both sides, online waits for second player
     if (mode === "bot") {
-      // Bot plays black — we'll generate a guest bot user if needed
-      const [botUser] = await db.select().from(usersTable).where(eq(usersTable.username, "ChessBot")).limit(1);
-      if (botUser) {
-        blackPlayerId = botUser.id;
+      // Bot plays black — auto-create ChessBot if not exists
+      let [botUser] = await db.select().from(usersTable).where(eq(usersTable.username, "ChessBot")).limit(1);
+      if (!botUser) {
+        const [newBot] = await db.insert(usersTable).values({
+          username: "ChessBot",
+          email: "chessbot@chesshub.internal",
+          isGuest: false,
+          role: "user",
+        }).returning();
+        botUser = newBot;
       }
+      blackPlayerId = botUser.id;
     } else if (mode === "local") {
       // Same user plays both sides in local mode
       blackPlayerId = req.userId!;
