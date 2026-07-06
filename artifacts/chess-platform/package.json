@@ -76,6 +76,7 @@
     "zod": "catalog:"
   },
   "dependencies": {
-    "chess.js": "^1.4.0"
+    "chess.js": "^1.4.0",
+    "workbox-window": "^7.4.1"
   }
 }
