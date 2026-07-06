@@ -7,12 +7,20 @@ import { Loader2, Play, Users, Trophy, Target } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 export default function Home() {
-  const { user } = useAuth();
-  const { data: dashboard, isLoading } = useGetDashboard({
+  const { user, isLoading: authLoading } = useAuth();
+  const { data: dashboard, isLoading: dashboardLoading } = useGetDashboard({
     query: {
       enabled: !!user
     }
   });
+
+  if (authLoading || dashboardLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (!user) {
     return (
@@ -35,13 +43,6 @@ export default function Home() {
     );
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-8">
