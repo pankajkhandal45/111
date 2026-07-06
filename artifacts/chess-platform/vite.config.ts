@@ -68,6 +68,25 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom'],
+          'router': ['wouter'],
+          'query': ['@tanstack/react-query'],
+          'chess': ['chess.js'],
+          'ui-radix': [
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-tooltip',
+            '@radix-ui/react-avatar',
+            '@radix-ui/react-label',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-select',
+          ],
+        },
+      },
+    },
   },
   server: {
     port,
