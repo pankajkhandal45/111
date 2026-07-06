@@ -1,7 +1,7 @@
-//import { registerSW } from 'virtual:pwa-register';
+import { registerSW } from 'virtual:pwa-register';
 import { createRoot } from "react-dom/client";
 
-//registerSW({ immediate: true });
+registerSW({ immediate: true });
 import App from "./App";
 import "./index.css";
 import { setBaseUrl } from "@workspace/api-client-react";
