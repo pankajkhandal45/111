@@ -29,6 +29,8 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use("/api", router);
+// Replit's path-based proxy strips the /api prefix before forwarding,
+// so mount the router at "/" (both Replit and local Vite proxy rewrite work this way).
+app.use("/", router);
 
 export default app;

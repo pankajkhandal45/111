@@ -114,6 +114,8 @@ export default defineConfig({
       "/api": {
         target: "http://localhost:8080",
         changeOrigin: true,
+        // Strip /api prefix before forwarding — matches Replit's path-based routing behavior
+        rewrite: (path) => path.replace(/^\/api/, ""),
       },
     },
   },
