@@ -1,0 +1,1 @@
+- [ChessHub setup](chesshub-setup.md) — uses libsql/SQLite (not PostgreSQL despite DATABASE_URL env); pnpm workspace monorepo

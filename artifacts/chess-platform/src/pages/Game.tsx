@@ -201,34 +201,44 @@ export default function Game() {
   const resignGame = useResignGame();
   const offerDraw = useOfferDraw();
 
-  // ── SSE: real-time game updates ──────────────────────────────────────────
+  // ── SSE: real-time game updates with auto-reconnect ──────────────────────
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!gameId) return;
+    let cancelled = false;
 
-    const token = localStorage.getItem('chess_token');
-    // EventSource doesn't support custom headers, so pass token as query param
-    const url = `/api/games/${gameId}/events${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+    function connect() {
+      if (cancelled) return;
+      const token = localStorage.getItem('chess_token');
+      const url = `/api/games/${gameId}/events${token ? `?token=${encodeURIComponent(token)}` : ''}`;
 
-    const es = new EventSource(url);
-    sseRef.current = es;
+      const es = new EventSource(url);
+      sseRef.current = es;
 
-    es.onmessage = (event) => {
-      try {
-        const updatedGame = JSON.parse(event.data);
-        // Directly update React Query cache — no refetch needed
-        queryClient.setQueryData(getGetGameQueryKey(gameId), updatedGame);
-      } catch { /* ignore malformed data */ }
-    };
+      es.onmessage = (event) => {
+        try {
+          const updatedGame = JSON.parse(event.data);
+          queryClient.setQueryData(getGetGameQueryKey(gameId), updatedGame);
+        } catch { /* ignore malformed data */ }
+      };
 
-    es.onerror = () => {
-      // SSE connection lost — close and let polling fallback take over
-      es.close();
-      sseRef.current = null;
-    };
+      es.onerror = () => {
+        es.close();
+        sseRef.current = null;
+        // Auto-reconnect after 3 seconds
+        if (!cancelled) {
+          reconnectTimerRef.current = setTimeout(connect, 3000);
+        }
+      };
+    }
+
+    connect();
 
     return () => {
-      es.close();
+      cancelled = true;
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      sseRef.current?.close();
       sseRef.current = null;
     };
   }, [gameId, queryClient]);
@@ -374,20 +384,11 @@ export default function Game() {
     );
   }
 
-  // Derive last move from game history for highlighting
+  // Derive last move from game moves array for highlighting
   const lastMove = (() => {
     if (!game.moves || game.moves.length === 0) return undefined;
-    try {
-      const tempChess = new Chess(game.fen);
-      const history = tempChess.history({ verbose: true });
-      if (history.length > 0) {
-        const last = history[history.length - 1];
-        return { from: last.from, to: last.to };
-      }
-    } catch (e) {
-      // ignore
-    }
-    return undefined;
+    const last = game.moves[game.moves.length - 1];
+    return last ? { from: last.from, to: last.to } : undefined;
   })();
 
   return (

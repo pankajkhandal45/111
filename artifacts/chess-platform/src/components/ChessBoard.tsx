@@ -34,15 +34,16 @@ export function ChessBoard({ fen, onMove, flipped = false, lastMove, disabled = 
   // Update internal chess state when fen changes from props
   useEffect(() => {
     const safeFen = fen && fen.trim() ? fen : DEFAULT_FEN;
-    if (safeFen !== chess.fen()) {
-      try {
-        const newChess = new Chess(safeFen);
-        setChess(newChess);
-      } catch (e) {
-        // Invalid FEN, keep current state
-      }
+    try {
+      const newChess = new Chess(safeFen);
+      setChess(newChess);
+      // Clear selection on external board update
+      setSelectedSquare(null);
+      setValidMoves([]);
+    } catch (e) {
+      // Invalid FEN, keep current state
     }
-  }, [fen, chess]);
+  }, [fen]); // Only re-run when fen prop changes, NOT when chess object changes
 
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [validMoves, setValidMoves] = useState<Move[]>([]);

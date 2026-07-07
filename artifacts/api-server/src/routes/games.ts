@@ -172,7 +172,7 @@ router.get("/games/active", requireAuth, async (req: AuthRequest, res) => {
     const activeGames = await db.query.gamesTable.findMany({
       where: eq(gamesTable.status, "active"),
       orderBy: [desc(gamesTable.createdAt)],
-      limit: 5,
+      limit: 20,
       with: {
         whitePlayer: { columns: { id: true, username: true, avatar: true } },
         blackPlayer: { columns: { id: true, username: true, avatar: true } },
@@ -247,6 +247,16 @@ router.post("/games/:id/move", requireAuth, async (req: AuthRequest, res) => {
     if (!game) { res.status(404).json({ error: "Game not found" }); return; }
     if (game.status !== "active") { res.status(400).json({ error: "Game is not active" }); return; }
 
+    // Authorization: only players in this game can move, and only on their turn
+    const userId = req.userId!;
+    const isWhite = game.whitePlayerId === userId;
+    const isBlack = game.blackPlayerId === userId;
+    const isLocal = game.mode === "local";
+    if (!isWhite && !isBlack) {
+      res.status(403).json({ error: "You are not a player in this game" });
+      return;
+    }
+
     // Validate move using chess.js
     const { Chess } = await import("chess.js");
     const chess = new Chess();
@@ -256,6 +266,20 @@ router.post("/games/:id/move", requireAuth, async (req: AuthRequest, res) => {
       chess.load(game.fen);
     }
     
+    // Enforce turn: white can only move on white's turn, black on black's turn
+    // (local games allow either player to move either side)
+    if (!isLocal) {
+      const expectedTurn = chess.turn(); // 'w' or 'b'
+      if (expectedTurn === 'w' && !isWhite) {
+        res.status(400).json({ error: "It is not your turn" });
+        return;
+      }
+      if (expectedTurn === 'b' && !isBlack) {
+        res.status(400).json({ error: "It is not your turn" });
+        return;
+      }
+    }
+
     let moveResult;
     try {
       moveResult = chess.move({ from, to, promotion: promotion || undefined });
@@ -307,15 +331,30 @@ router.post("/games/:id/move", requireAuth, async (req: AuthRequest, res) => {
       updatedAt: new Date(),
     }).where(eq(gamesTable.id, id));
 
-    // If bot game and not over, compute bot move
-    if (game.mode === "bot" && status === "active") {
-      await computeBotMove(id, newPgn, newFen, game.botLevel || "easy");
-    }
-
     const updatedGame = await getFullGame(id);
     // Push real-time update to all SSE subscribers of this game
     pushGameUpdate(id, updatedGame);
     res.json(updatedGame);
+
+    // If bot game and not over, compute bot move in background (non-blocking)
+    if (game.mode === "bot" && status === "active") {
+      setImmediate(async () => {
+        try {
+          // Reload current state — game may have changed (resign/draw) before this fires
+          const [currentGame] = await db.select().from(gamesTable).where(eq(gamesTable.id, id)).limit(1);
+          if (!currentGame || currentGame.status !== "active") return; // game already over
+          const { Chess: Chess2 } = await import("chess.js");
+          const verifyChess = new Chess2();
+          try { verifyChess.loadPgn(currentGame.pgn || ""); } catch { verifyChess.load(currentGame.fen); }
+          if (verifyChess.turn() !== 'b') return; // not bot's turn (bot is always black)
+          await computeBotMove(id, currentGame.pgn || "", currentGame.fen, currentGame.botLevel || "easy");
+          const botUpdatedGame = await getFullGame(id);
+          if (botUpdatedGame) pushGameUpdate(id, botUpdatedGame);
+        } catch (err) {
+          console.error("Background bot move error:", err);
+        }
+      });
+    }
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Failed to make move" });
