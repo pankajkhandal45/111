@@ -29,8 +29,11 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Replit's path-based proxy strips the /api prefix before forwarding,
-// so mount the router at "/" (both Replit and local Vite proxy rewrite work this way).
-app.use("/", router);
+// API_ROUTE_PREFIX controls where routes are mounted.
+//   Replit:     leave unset  → proxy strips /api prefix → mount at "/"
+//   Render.com: set to /api  → Vercel proxy keeps /api prefix → mount at "/api"
+//   Local dev:  Vite proxy rewrites /api → "" so same as Replit
+const routePrefix = process.env.API_ROUTE_PREFIX || "/";
+app.use(routePrefix, router);
 
 export default app;

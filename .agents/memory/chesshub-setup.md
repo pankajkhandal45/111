@@ -17,10 +17,13 @@ description: Key facts about the ChessHub chess platform project — DB, build, 
 - Bot move runs in `setImmediate` (non-blocking); reloads game state before writing to avoid stale overwrites
 - Auth middleware supports token via query param for SSE (EventSource can't send headers)
 
-## Replit proxy path stripping (CRITICAL)
-- Replit's path router strips the artifact prefix before forwarding to the service port
-- API server artifact has previewPath `/api` → browser sends `/api/auth/login` → Replit strips → server gets `/auth/login`
-- **Fix applied:** `app.use("/", router)` in `app.ts` (NOT `/api`); Vite dev proxy also rewrites to strip `/api` prefix
-- **Why:** Without this, ALL API calls from the browser silently 404 because the router mount path doesn't match
+## Routing across platforms (CRITICAL)
+- Replit strips the artifact prefix (`/api`) before forwarding → server gets `/auth/login`
+- Render.com does NOT strip prefix → server gets `/api/auth/login`
+- Fix: `API_ROUTE_PREFIX` env var in `app.ts` (default `/`; set to `/api` on Render.com)
+- Vite dev proxy strips `/api` prefix to match Replit behavior
+- `vercel.json` proxies `/api/:path*` → `https://chesshub-fzpb.onrender.com/api/:path*` (keeps prefix for Render)
+- `main.tsx`: do NOT set setBaseUrl fallback to `localhost:8080` — browser can't reach container's localhost; use relative paths so platform proxy handles routing
+- **Why:** Without this ALL API calls 404 silently across all environments
 
 **Why:** These were non-obvious configuration/design decisions that caused hours of debugging on first setup.
