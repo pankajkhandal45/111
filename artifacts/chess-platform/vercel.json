@@ -1,12 +1,14 @@
 {
-  "rewrites": [
+  "routes": [
+    { "handle": "filesystem" },
     {
-      "source": "/api/:path*",
-      "destination": "https://chesshub-fzpb.onrender.com/api/:path*"
+      "src": "/api/(.*)",
+      "dest": "https://chesshub-fzpb.onrender.com/api/$1",
+      "headers": { "x-forwarded-host": "$host" }
     },
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ]
 }
