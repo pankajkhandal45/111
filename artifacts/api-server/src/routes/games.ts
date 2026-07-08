@@ -32,7 +32,7 @@ function pushGameUpdate(gameId: number, gameData: unknown) {
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
-const TIME_CONTROL_MS: Record<string, number> = {
+const TIME_CONTROL_MS: Record<string, number | null> = {
   bullet1: 60000,
   bullet2: 120000,
   blitz3: 180000,
@@ -41,12 +41,14 @@ const TIME_CONTROL_MS: Record<string, number> = {
   rapid15: 900000,
   rapid30: 1800000,
   classical60: 3600000,
+  unlimited: null,
 };
 
 function getTimeControlCategory(tc: string): "bullet" | "blitz" | "rapid" | "classical" {
   if (tc.startsWith("bullet")) return "bullet";
   if (tc.startsWith("blitz")) return "blitz";
   if (tc.startsWith("rapid")) return "rapid";
+  if (tc === "unlimited") return "classical"; // leaderboard fallback
   return "classical";
 }
 
@@ -84,7 +86,12 @@ router.post("/games", requireAuth, async (req: AuthRequest, res) => {
       return;
     }
 
-    const timeMs = initialTime ? initialTime * 1000 : TIME_CONTROL_MS[timeControl] ?? 300000;
+    // null = unlimited (no clock); undefined key falls back to 5-min default
+    const timeMs = initialTime
+      ? initialTime * 1000
+      : timeControl in TIME_CONTROL_MS
+        ? TIME_CONTROL_MS[timeControl]   // may be null for "unlimited"
+        : 300000;
 
     let whitePlayerId = req.userId!;
     let blackPlayerId: number | null = null;
