@@ -47,29 +47,17 @@ const routePrefix = process.env.API_ROUTE_PREFIX || "/";
 app.use(routePrefix, router);
 
 // ── Serve built frontend (single-server / Render.com deployment) ──────────────
-// __dirname is injected by esbuild banner → points to artifacts/api-server/dist/
-// Frontend dist is two levels up then into artifacts/chess-platform/dist.
-// We also try process.cwd()-relative as a fallback for environments where
-// __dirname may differ.
-const candidates = [
-  path.resolve(__dirname, "../../artifacts/chess-platform/dist"),
-  path.resolve(process.cwd(), "artifacts/chess-platform/dist"),
-];
-const frontendDist = candidates.find(existsSync) ?? null;
-
-logger.info({ candidates, frontendDist }, "Frontend dist lookup");
-
-if (frontendDist) {
+// Build step copies chess-platform/dist → api-server/dist/public so it travels
+// with the bundle and is always reachable at __dirname/public — no cwd guessing.
+const frontendDist = path.resolve(__dirname, "public");
+if (existsSync(frontendDist)) {
   app.use(express.static(frontendDist));
-
-  // SPA fallback — all non-API routes return index.html
   app.get("*", (_req, res) => {
     res.sendFile(path.join(frontendDist, "index.html"));
   });
-
   logger.info({ frontendDist }, "Serving frontend static files");
 } else {
-  logger.warn("Frontend dist not found — API-only mode (dev or missing build)");
+  logger.warn({ frontendDist }, "Frontend dist not found — API-only mode");
 }
 
 export default app;
