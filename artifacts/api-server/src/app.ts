@@ -47,20 +47,29 @@ const routePrefix = process.env.API_ROUTE_PREFIX || "/";
 app.use(routePrefix, router);
 
 // ── Serve built frontend (single-server / Render.com deployment) ──────────────
-// In production we ship both frontend and backend in one Render service.
-// The frontend is built into artifacts/chess-platform/dist before the server
-// starts.  In local dev the frontend runs on its own Vite server, so we skip
-// this block when the dist folder doesn't exist.
-const frontendDist = path.resolve(process.cwd(), "artifacts/chess-platform/dist");
-if (existsSync(frontendDist)) {
+// __dirname is injected by esbuild banner → points to artifacts/api-server/dist/
+// Frontend dist is two levels up then into artifacts/chess-platform/dist.
+// We also try process.cwd()-relative as a fallback for environments where
+// __dirname may differ.
+const candidates = [
+  path.resolve(__dirname, "../../artifacts/chess-platform/dist"),
+  path.resolve(process.cwd(), "artifacts/chess-platform/dist"),
+];
+const frontendDist = candidates.find(existsSync) ?? null;
+
+logger.info({ candidates, frontendDist }, "Frontend dist lookup");
+
+if (frontendDist) {
   app.use(express.static(frontendDist));
 
   // SPA fallback — all non-API routes return index.html
-  app.get("*", (req, res) => {
+  app.get("*", (_req, res) => {
     res.sendFile(path.join(frontendDist, "index.html"));
   });
 
   logger.info({ frontendDist }, "Serving frontend static files");
+} else {
+  logger.warn("Frontend dist not found — API-only mode (dev or missing build)");
 }
 
 export default app;
