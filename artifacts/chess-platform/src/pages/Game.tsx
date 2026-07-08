@@ -316,8 +316,10 @@ export default function Game() {
         makeMove.mutate(
           { id: gameId, data: { from, to, promotion } },
           {
-            onSuccess: () => {
-              queryClient.invalidateQueries({ queryKey: getGetGameQueryKey(gameId) });
+            onSuccess: (updatedGame) => {
+              // Server already returned the full updated game — set cache directly,
+              // no second GET request needed.
+              queryClient.setQueryData(getGetGameQueryKey(gameId), updatedGame);
             },
             onError: () => {
               // Revert on error

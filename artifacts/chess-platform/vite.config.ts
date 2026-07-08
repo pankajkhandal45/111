@@ -80,20 +80,35 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom'],
-          'router': ['wouter'],
-          'query': ['@tanstack/react-query'],
-          'chess': ['chess.js'],
-          'ui-radix': [
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-tooltip',
-            '@radix-ui/react-avatar',
-            '@radix-ui/react-label',
-            '@radix-ui/react-tabs',
-            '@radix-ui/react-select',
-          ],
+        manualChunks(id) {
+          // React core — must be a single shared chunk so hooks work correctly
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/') || id.includes('node_modules/scheduler/')) {
+            return 'react-vendor';
+          }
+          // Framer Motion is ~100 KB on its own — split it out
+          if (id.includes('node_modules/framer-motion/')) {
+            return 'framer-motion';
+          }
+          // Chess engine
+          if (id.includes('node_modules/chess.js/')) {
+            return 'chess';
+          }
+          // TanStack Query
+          if (id.includes('node_modules/@tanstack/')) {
+            return 'query';
+          }
+          // Radix UI primitives
+          if (id.includes('node_modules/@radix-ui/')) {
+            return 'ui-radix';
+          }
+          // Wouter router
+          if (id.includes('node_modules/wouter/')) {
+            return 'router';
+          }
+          // date-fns / other formatting utils
+          if (id.includes('node_modules/date-fns/') || id.includes('node_modules/clsx/') || id.includes('node_modules/class-variance-authority/')) {
+            return 'format';
+          }
         },
       },
     },

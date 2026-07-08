@@ -4,6 +4,7 @@ import { gamesTable, movesTable, usersTable, ratingsTable } from "@workspace/db"
 import { eq, and, or, desc } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../lib/auth";
 import { formatGameSummary } from "./users";
+import { Chess } from "chess.js";
 
 const router = Router();
 
@@ -258,7 +259,6 @@ router.post("/games/:id/move", requireAuth, async (req: AuthRequest, res) => {
     }
 
     // Validate move using chess.js
-    const { Chess } = await import("chess.js");
     const chess = new Chess();
     if (game.pgn) {
       chess.loadPgn(game.pgn);
@@ -343,8 +343,7 @@ router.post("/games/:id/move", requireAuth, async (req: AuthRequest, res) => {
           // Reload current state — game may have changed (resign/draw) before this fires
           const [currentGame] = await db.select().from(gamesTable).where(eq(gamesTable.id, id)).limit(1);
           if (!currentGame || currentGame.status !== "active") return; // game already over
-          const { Chess: Chess2 } = await import("chess.js");
-          const verifyChess = new Chess2();
+          const verifyChess = new Chess();
           try { verifyChess.loadPgn(currentGame.pgn || ""); } catch { verifyChess.load(currentGame.fen); }
           if (verifyChess.turn() !== 'b') return; // not bot's turn (bot is always black)
           await computeBotMove(id, currentGame.pgn || "", currentGame.fen, currentGame.botLevel || "easy");
@@ -496,7 +495,6 @@ async function getFullGame(id: number) {
 
 async function computeBotMove(gameId: number, pgn: string, fen: string, level: string) {
   try {
-    const { Chess } = await import("chess.js");
     const chess = new Chess();
     if (pgn) {
       chess.loadPgn(pgn);
