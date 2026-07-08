@@ -3,7 +3,7 @@ import { useLocation, useParams } from 'wouter';
 import { ChessBoard } from '@/components/ChessBoard';
 import { GameClock } from '@/components/GameClock';
 import { MoveHistory } from '@/components/MoveHistory';
-import { useGetGame, useMakeMove, useResignGame, useOfferDraw, getGetGameQueryKey, type Game } from '@workspace/api-client-react';
+import { useGetGame, useMakeMove, useResignGame, useOfferDraw, getGetGameQueryKey, getBaseUrl, type Game } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -211,7 +211,15 @@ export default function Game() {
     function connect() {
       if (cancelled) return;
       const token = localStorage.getItem('chess_token');
-      const url = `/api/games/${gameId}/events${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+      const qs = token ? `?token=${encodeURIComponent(token)}` : '';
+
+      // If a base URL is configured (e.g. Vercel → Render.com), use an absolute
+      // URL so the SSE stream goes directly to the API server instead of through
+      // Vercel's edge proxy, which cannot hold long-lived streaming connections.
+      const base = getBaseUrl();
+      const url = base
+        ? `${base}/games/${gameId}/events${qs}`       // absolute: baseUrl already includes /api
+        : `/api/games/${gameId}/events${qs}`;          // relative: Vite/Replit proxy handles /api
 
       const es = new EventSource(url);
       sseRef.current = es;

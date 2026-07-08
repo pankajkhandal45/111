@@ -30,6 +30,15 @@ export function setBaseUrl(url: string | null): void {
 }
 
 /**
+ * Return the currently configured base URL (or null if not set).
+ * Useful for constructing URLs for APIs that bypass customFetch
+ * (e.g. EventSource for SSE streams).
+ */
+export function getBaseUrl(): string | null {
+  return _baseUrl;
+}
+
+/**
  * Register a getter that supplies a bearer auth token.  Before every fetch
  * the getter is invoked; when it returns a non-null string, an
  * `Authorization: Bearer <token>` header is attached to the request.
