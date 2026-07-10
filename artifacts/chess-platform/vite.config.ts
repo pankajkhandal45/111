@@ -3,15 +3,12 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import { VitePWA } from "vite-plugin-pwa";
-import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
+// PORT is only meaningful for the dev/preview server, not for production builds.
+// Fall back to 5173 if PORT is missing or invalid so `vite build` never throws.
 const rawPort = process.env.PORT || "5173";
-
-const port = Number(rawPort);
-
-if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
-}
+const parsedPort = Number(rawPort);
+const port = Number.isNaN(parsedPort) || parsedPort <= 0 ? 5173 : parsedPort;
 
 const basePath = process.env.BASE_PATH || "/";
 
@@ -20,7 +17,6 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    runtimeErrorOverlay(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['image.png'],
@@ -84,20 +80,35 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom'],
-          'router': ['wouter'],
-          'query': ['@tanstack/react-query'],
-          'chess': ['chess.js'],
-          'ui-radix': [
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-tooltip',
-            '@radix-ui/react-avatar',
-            '@radix-ui/react-label',
-            '@radix-ui/react-tabs',
-            '@radix-ui/react-select',
-          ],
+        manualChunks(id) {
+          // React core — must be a single shared chunk so hooks work correctly
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/') || id.includes('node_modules/scheduler/')) {
+            return 'react-vendor';
+          }
+          // Framer Motion is ~100 KB on its own — split it out
+          if (id.includes('node_modules/framer-motion/')) {
+            return 'framer-motion';
+          }
+          // Chess engine
+          if (id.includes('node_modules/chess.js/')) {
+            return 'chess';
+          }
+          // TanStack Query
+          if (id.includes('node_modules/@tanstack/')) {
+            return 'query';
+          }
+          // Radix UI primitives
+          if (id.includes('node_modules/@radix-ui/')) {
+            return 'ui-radix';
+          }
+          // Wouter router
+          if (id.includes('node_modules/wouter/')) {
+            return 'router';
+          }
+          // date-fns / other formatting utils
+          if (id.includes('node_modules/date-fns/') || id.includes('node_modules/clsx/') || id.includes('node_modules/class-variance-authority/')) {
+            return 'format';
+          }
         },
       },
     },
@@ -114,6 +125,9 @@ export default defineConfig({
       "/api": {
         target: "http://localhost:8080",
         changeOrigin: true,
+        // Strip /api prefix before forwarding — matches Replit's path-based routing behavior.
+        // Use word-boundary anchor so /apiary/... etc. are not accidentally rewritten.
+        rewrite: (path) => path.replace(/^\/api(?=\/|$)/, ""),
       },
     },
   },

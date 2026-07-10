@@ -6,8 +6,12 @@ import App from "./App";
 import "./index.css";
 import { setBaseUrl } from "@workspace/api-client-react";
 
-// Set the API base URL from the environment, falling back to localhost for local development
-const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8080";
-setBaseUrl(apiUrl);
+// Only set a base URL when explicitly configured (e.g. for native mobile builds).
+// In web builds (Replit preview, Vercel) API calls use relative paths so the
+// platform proxy (Replit path-router or vercel.json rewrite) handles routing.
+const apiUrl = import.meta.env.VITE_API_URL;
+if (apiUrl) {
+  setBaseUrl(apiUrl);
+}
 
 createRoot(document.getElementById("root")!).render(<App />);

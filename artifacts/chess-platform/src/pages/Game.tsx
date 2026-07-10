@@ -3,7 +3,7 @@ import { useLocation, useParams } from 'wouter';
 import { ChessBoard } from '@/components/ChessBoard';
 import { GameClock } from '@/components/GameClock';
 import { MoveHistory } from '@/components/MoveHistory';
-import { useGetGame, useMakeMove, useResignGame, useOfferDraw, getGetGameQueryKey, type Game } from '@workspace/api-client-react';
+import { useGetGame, useMakeMove, useResignGame, useOfferDraw, getGetGameQueryKey, getBaseUrl, type Game } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -201,34 +201,52 @@ export default function Game() {
   const resignGame = useResignGame();
   const offerDraw = useOfferDraw();
 
-  // ── SSE: real-time game updates ──────────────────────────────────────────
+  // ── SSE: real-time game updates with auto-reconnect ──────────────────────
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!gameId) return;
+    let cancelled = false;
 
-    const token = localStorage.getItem('chess_token');
-    // EventSource doesn't support custom headers, so pass token as query param
-    const url = `/api/games/${gameId}/events${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+    function connect() {
+      if (cancelled) return;
+      const token = localStorage.getItem('chess_token');
+      const qs = token ? `?token=${encodeURIComponent(token)}` : '';
 
-    const es = new EventSource(url);
-    sseRef.current = es;
+      // If a base URL is configured (e.g. Vercel → Render.com), use an absolute
+      // URL so the SSE stream goes directly to the API server instead of through
+      // Vercel's edge proxy, which cannot hold long-lived streaming connections.
+      const base = getBaseUrl();
+      const url = base
+        ? `${base}/games/${gameId}/events${qs}`       // absolute: baseUrl already includes /api
+        : `/api/games/${gameId}/events${qs}`;          // relative: Vite/Replit proxy handles /api
 
-    es.onmessage = (event) => {
-      try {
-        const updatedGame = JSON.parse(event.data);
-        // Directly update React Query cache — no refetch needed
-        queryClient.setQueryData(getGetGameQueryKey(gameId), updatedGame);
-      } catch { /* ignore malformed data */ }
-    };
+      const es = new EventSource(url);
+      sseRef.current = es;
 
-    es.onerror = () => {
-      // SSE connection lost — close and let polling fallback take over
-      es.close();
-      sseRef.current = null;
-    };
+      es.onmessage = (event) => {
+        try {
+          const updatedGame = JSON.parse(event.data);
+          queryClient.setQueryData(getGetGameQueryKey(gameId), updatedGame);
+        } catch { /* ignore malformed data */ }
+      };
+
+      es.onerror = () => {
+        es.close();
+        sseRef.current = null;
+        // Auto-reconnect after 3 seconds
+        if (!cancelled) {
+          reconnectTimerRef.current = setTimeout(connect, 3000);
+        }
+      };
+    }
+
+    connect();
 
     return () => {
-      es.close();
+      cancelled = true;
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      sseRef.current?.close();
       sseRef.current = null;
     };
   }, [gameId, queryClient]);
@@ -306,8 +324,10 @@ export default function Game() {
         makeMove.mutate(
           { id: gameId, data: { from, to, promotion } },
           {
-            onSuccess: () => {
-              queryClient.invalidateQueries({ queryKey: getGetGameQueryKey(gameId) });
+            onSuccess: (updatedGame) => {
+              // Server already returned the full updated game — set cache directly,
+              // no second GET request needed.
+              queryClient.setQueryData(getGetGameQueryKey(gameId), updatedGame);
             },
             onError: () => {
               // Revert on error
@@ -374,20 +394,11 @@ export default function Game() {
     );
   }
 
-  // Derive last move from game history for highlighting
+  // Derive last move from game moves array for highlighting
   const lastMove = (() => {
     if (!game.moves || game.moves.length === 0) return undefined;
-    try {
-      const tempChess = new Chess(game.fen);
-      const history = tempChess.history({ verbose: true });
-      if (history.length > 0) {
-        const last = history[history.length - 1];
-        return { from: last.from, to: last.to };
-      }
-    } catch (e) {
-      // ignore
-    }
-    return undefined;
+    const last = game.moves[game.moves.length - 1];
+    return last ? { from: last.from, to: last.to } : undefined;
   })();
 
   return (
