@@ -402,7 +402,7 @@ export default function Game() {
   })();
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-100px)]">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-20 md:pb-0 lg:h-[calc(100vh-100px)]">
       {/* ── Game Over Modal ── */}
       {showGameOver && game?.status === 'finished' && (
         <GameOverModal
