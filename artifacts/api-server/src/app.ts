@@ -40,11 +40,8 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// API routes — always at /api so the frontend can use /api/... on the same origin.
-// On Replit the Vite proxy rewrites /api → / before hitting this server,
-// so we honour API_ROUTE_PREFIX for backward compatibility.
-const routePrefix = process.env.API_ROUTE_PREFIX || "/";
-app.use(routePrefix, router);
+// API routes always mounted at /api — Vite dev proxy forwards /api/* as-is.
+app.use("/api", router);
 
 // ── Serve built frontend (single-server / Render.com deployment) ──────────────
 // Build step copies chess-platform/dist → api-server/dist/public so it travels
