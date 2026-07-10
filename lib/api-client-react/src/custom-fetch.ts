@@ -29,17 +29,13 @@ export function setBaseUrl(url: string | null): void {
   _baseUrl = url ? url.replace(/\/+$/, "") : null;
 }
 
-export function getBaseUrl(): string {
-  return _baseUrl || "";
-}
-
 /**
  * Return the currently configured base URL (or null if not set).
  * Useful for constructing URLs for APIs that bypass customFetch
  * (e.g. EventSource for SSE streams).
  */
-export function getBaseUrl(): string | null {
-  return _baseUrl;
+export function getBaseUrl(): string {
+  return _baseUrl || "";
 }
 
 /**
