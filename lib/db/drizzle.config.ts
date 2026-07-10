@@ -1,11 +1,16 @@
 import { defineConfig } from "drizzle-kit";
-import path from "path";
+
+const isRemote = process.env.DATABASE_URL?.startsWith("libsql://");
 
 export default defineConfig({
   schema: "./src/schema/index.ts",
-  dialect: "turso",
-  dbCredentials: {
-    url: process.env.DATABASE_URL || "file:../../sqlite.db",
-    authToken: process.env.DATABASE_AUTH_TOKEN,
-  },
+  dialect: isRemote ? "turso" : "sqlite",
+  dbCredentials: isRemote
+    ? {
+        url: process.env.DATABASE_URL!,
+        authToken: process.env.DATABASE_AUTH_TOKEN,
+      }
+    : {
+        url: process.env.DATABASE_URL || "file:../../sqlite.db",
+      },
 });

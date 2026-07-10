@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { getBaseUrl } from '@workspace/api-client-react';
 
 export function useHeartbeat() {
   const { token } = useAuth();
@@ -8,7 +9,8 @@ export function useHeartbeat() {
     if (!token) return;
 
     const ping = () => {
-      fetch('/api/auth/heartbeat', {
+      const base = getBaseUrl().replace(/\/$/, '');
+      fetch(`${base}/api/auth/heartbeat`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       }).catch(() => {});
