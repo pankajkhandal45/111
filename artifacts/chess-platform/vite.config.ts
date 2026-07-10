@@ -29,7 +29,7 @@ export default defineConfig({
             handler: 'NetworkOnly',
           },
           {
-            urlPattern: /^https:\/\/chesshub-fzpb\.onrender\.com\/api\//,
+            urlPattern: /^https:\/\/chesshub-kpl4\.onrender\.com\/api\//,
             handler: 'NetworkOnly',
           },
         ],
