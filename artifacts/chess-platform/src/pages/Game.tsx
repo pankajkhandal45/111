@@ -213,12 +213,11 @@ export default function Game() {
       const qs = token ? `?token=${encodeURIComponent(token)}` : '';
 
       // If a base URL is configured (e.g. Vercel → Render.com), use an absolute
-      // URL so the SSE stream goes directly to the API server instead of through
-      // Vercel's edge proxy, which cannot hold long-lived streaming connections.
+      // URL so the SSE stream goes directly to the API server.
       const base = getBaseUrl();
       const url = base
-        ? `${base}/games/${gameId}/events${qs}`       // absolute: baseUrl already includes /api
-        : `/api/games/${gameId}/events${qs}`;          // relative: Vite/Replit proxy handles /api
+        ? `${base}/api/games/${gameId}/events${qs}`    // absolute: add /api prefix
+        : `/api/games/${gameId}/events${qs}`;           // relative: Vite proxy handles /api
 
       const es = new EventSource(url);
       sseRef.current = es;
@@ -249,6 +248,79 @@ export default function Game() {
       sseRef.current = null;
     };
   }, [gameId, queryClient]);
+
+  // ── Client-side bot logic (runs in browser, instant response) ────────────
+  useEffect(() => {
+    if (!game || game.mode !== 'bot' || game.status !== 'active') return;
+    if (chess.turn() !== 'b') return;
+    if (chess.isGameOver()) return;
+
+    const botLevel = (game as any).botLevel || 'intermediate';
+
+    const timer = setTimeout(() => {
+      const moves = chess.moves({ verbose: true });
+      if (moves.length === 0) return;
+
+      let selectedMove: any;
+
+      if (botLevel === 'beginner') {
+        selectedMove = moves[Math.floor(Math.random() * moves.length)];
+      } else if (botLevel === 'easy') {
+        const captures = moves.filter((m: any) => m.flags.includes('c'));
+        selectedMove = captures.length > 0 && Math.random() > 0.5
+          ? captures[Math.floor(Math.random() * captures.length)]
+          : moves[Math.floor(Math.random() * moves.length)];
+      } else {
+        const depth = botLevel === 'intermediate' ? 2
+          : botLevel === 'advanced' ? 3
+          : botLevel === 'expert' ? 4
+          : 4;
+
+        const pieceValues: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 };
+        const evaluate = (c: Chess) => {
+          let score = 0;
+          for (const row of c.board()) {
+            for (const sq of row) {
+              if (!sq) continue;
+              const val = pieceValues[sq.type] || 0;
+              score += sq.color === 'b' ? val : -val;
+            }
+          }
+          return score;
+        };
+
+        const minimax = (c: Chess, d: number, alpha: number, beta: number, max: boolean): number => {
+          if (d === 0 || c.isGameOver()) return evaluate(c);
+          const ms = c.moves({ verbose: true });
+          if (max) {
+            let best = -Infinity;
+            for (const m of ms) { c.move(m); best = Math.max(best, minimax(c, d-1, alpha, beta, false)); c.undo(); alpha = Math.max(alpha, best); if (beta <= alpha) break; }
+            return best;
+          } else {
+            let best = Infinity;
+            for (const m of ms) { c.move(m); best = Math.min(best, minimax(c, d-1, alpha, beta, true)); c.undo(); beta = Math.min(beta, best); if (beta <= alpha) break; }
+            return best;
+          }
+        };
+
+        let bestScore = -Infinity;
+        let bestMove = moves[0];
+        for (const m of [...moves].sort(() => Math.random() - 0.5)) {
+          chess.move(m); const score = minimax(chess, depth-1, -Infinity, Infinity, false); chess.undo();
+          if (score > bestScore) { bestScore = score; bestMove = m; }
+        }
+        selectedMove = bestMove;
+      }
+
+      makeMove.mutate(
+        { id: gameId, data: { from: selectedMove.from, to: selectedMove.to, promotion: selectedMove.promotion } },
+        { onSuccess: (updatedGame) => queryClient.setQueryData(getGetGameQueryKey(gameId), updatedGame) }
+      );
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [game?.status, game?.mode, chess.fen()]);
+  // ─────────────────────────────────────────────────────────────────────────
   // ─────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -272,6 +344,11 @@ export default function Game() {
     return <div className="flex justify-center items-center h-[60vh]"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   }
 
+  // These must be computed before any further early returns (hooks must run unconditionally above)
+  const isWhite = user?.id === game.whitePlayerId;
+  const isBlack = user?.id === game.blackPlayerId;
+  const isLocal = game.mode === 'local';
+  const isBot2 = game.mode === 'bot';
 
   // Waiting lobby for private matches
   if (game.status === 'waiting') {
@@ -303,114 +380,10 @@ export default function Game() {
     );
   }
 
-  const isWhite = user?.id === game.whitePlayerId;
-  const isBlack = user?.id === game.blackPlayerId;
-  const isLocal = game.mode === 'local';
   const isPlaying = isWhite || isBlack;
   const playerColor = isWhite ? 'white' : 'black';
   const myTurn = (chess.turn() === 'w' && isWhite) || (chess.turn() === 'b' && isBlack) || isLocal;
-
-  const isBot = game.mode === 'bot';
-
-  // ── Client-side bot logic (instant, no server round-trip) ────────────────
-  useEffect(() => {
-    if (!isBot || game.status !== 'active') return;
-    // Bot plays black (index 1 in chess.js turn = 'b')
-    if (chess.turn() !== 'b') return;
-    if (chess.isGameOver()) return;
-
-    const botLevel = (game as any).botLevel || 'intermediate';
-
-    const timer = setTimeout(() => {
-      const moves = chess.moves({ verbose: true });
-      if (moves.length === 0) return;
-
-      let selectedMove;
-
-      if (botLevel === 'beginner') {
-        // Random move
-        selectedMove = moves[Math.floor(Math.random() * moves.length)];
-      } else if (botLevel === 'easy') {
-        // Mostly random with slight preference for captures
-        const captures = moves.filter(m => m.flags.includes('c'));
-        selectedMove = captures.length > 0 && Math.random() > 0.5
-          ? captures[Math.floor(Math.random() * captures.length)]
-          : moves[Math.floor(Math.random() * moves.length)];
-      } else {
-        // Minimax depth based on level
-        const depth = botLevel === 'intermediate' ? 2
-          : botLevel === 'advanced' ? 3
-          : botLevel === 'expert' ? 4
-          : botLevel === 'master' ? 4
-          : 5;
-
-        const pieceValues: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 };
-
-        const evaluate = (c: Chess) => {
-          let score = 0;
-          const board = c.board();
-          for (const row of board) {
-            for (const sq of row) {
-              if (!sq) continue;
-              const val = pieceValues[sq.type] || 0;
-              score += sq.color === 'b' ? val : -val;
-            }
-          }
-          return score;
-        };
-
-        const minimax = (c: Chess, d: number, alpha: number, beta: number, maximizing: boolean): number => {
-          if (d === 0 || c.isGameOver()) return evaluate(c);
-          const legalMoves = c.moves({ verbose: true });
-          if (maximizing) {
-            let best = -Infinity;
-            for (const m of legalMoves) {
-              c.move(m);
-              best = Math.max(best, minimax(c, d - 1, alpha, beta, false));
-              c.undo();
-              alpha = Math.max(alpha, best);
-              if (beta <= alpha) break;
-            }
-            return best;
-          } else {
-            let best = Infinity;
-            for (const m of legalMoves) {
-              c.move(m);
-              best = Math.min(best, minimax(c, d - 1, alpha, beta, true));
-              c.undo();
-              beta = Math.min(beta, best);
-              if (beta <= alpha) break;
-            }
-            return best;
-          }
-        };
-
-        let bestScore = -Infinity;
-        let bestMove = moves[0];
-        const shuffled = [...moves].sort(() => Math.random() - 0.5);
-        for (const m of shuffled) {
-          chess.move(m);
-          const score = minimax(chess, depth - 1, -Infinity, Infinity, false);
-          chess.undo();
-          if (score > bestScore) { bestScore = score; bestMove = m; }
-        }
-        selectedMove = bestMove;
-      }
-
-      // Make bot move via API so it's saved to DB
-      makeMove.mutate(
-        { id: gameId, data: { from: selectedMove.from, to: selectedMove.to, promotion: selectedMove.promotion } },
-        {
-          onSuccess: (updatedGame) => {
-            queryClient.setQueryData(getGetGameQueryKey(gameId), updatedGame);
-          }
-        }
-      );
-    }, 300); // small delay so it feels natural
-
-    return () => clearTimeout(timer);
-  }, [chess.fen(), isBot, game.status]);
-  // ─────────────────────────────────────────────────────────────────────────
+  const isBot = isBot2;
 
   const handleMove = (from: string, to: string, promotion?: string) => {
     if (!myTurn || game.status !== 'active') return;
