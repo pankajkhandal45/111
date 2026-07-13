@@ -32,19 +32,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     queryClient.clear();
   };
 
-  const { data: user, isLoading } = useGetMe({
+  const { data: user, isLoading, error } = useGetMe({
     query: {
       enabled: !!token,
       retry: false,
     },
   });
 
-  // If token is invalid, clear it
+  // Only clear the token if we explicitly get a 401 Unauthorized error
   useEffect(() => {
-    if (!isLoading && token && !user) {
+    if (error && (error as any).status === 401) {
       setToken(null);
     }
-  }, [isLoading, token, user]);
+  }, [error]);
 
   return (
     <AuthContext.Provider value={{ user: user || null, token, setToken, logout, isLoading }}>

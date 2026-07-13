@@ -394,22 +394,44 @@ export default function Game() {
     try {
       const moveResult = chess.move({ from, to, promotion: promotion || 'q' });
       if (moveResult) {
-        // Update local state speculatively
-        setChess(new Chess(chess.fen()));
+        const newFen = chess.fen();
+        // Update local chess state speculatively
+        setChess(new Chess(newFen));
+
+        // Create an optimistic game object so the whole UI (MoveHistory, lastMove highlights) updates instantly
+        const optimisticGame = {
+          ...game,
+          fen: newFen,
+          moves: [
+            ...(game.moves || []),
+            { 
+              id: Date.now(), // fake ID
+              gameId: gameId,
+              playerColor: chess.turn() === 'w' ? 'black' : 'white', // the player who just moved
+              from, 
+              to, 
+              promotion: promotion || null, 
+              san: moveResult.san, 
+              piece: moveResult.piece,
+              fenAfter: newFen,
+              createdAt: new Date().toISOString()
+            }
+          ]
+        };
+
+        // Instantly update the cache
+        queryClient.setQueryData(getGetGameQueryKey(gameId), optimisticGame);
 
         makeMove.mutate(
           { id: gameId, data: { from, to, promotion } },
           {
             onSuccess: (updatedGame) => {
-              // Server already returned the full updated game — set cache directly,
-              // no second GET request needed.
+              // Server returns the true updated game (with proper DB IDs and timestamps)
               queryClient.setQueryData(getGetGameQueryKey(gameId), updatedGame);
             },
             onError: () => {
-              // Revert on error
-              const reverted = new Chess();
-              reverted.load(game.fen);
-              setChess(reverted);
+              // Revert on error by refetching from server
+              queryClient.invalidateQueries({ queryKey: getGetGameQueryKey(gameId) });
             }
           }
         );
