@@ -182,11 +182,13 @@ export default function Game() {
   const [rotatePieces, setRotatePieces] = useState(false);
   const prevStatusRef = useRef<string | undefined>(undefined);
 
+  const makeMove = useMakeMove();
+
   // Polling fallback — 2s for active games so moves never lag more than 2s
   const { data: game, isLoading } = useGetGame(gameId, {
     query: {
       queryKey: getGetGameQueryKey(gameId),
-      enabled: !!gameId,
+      enabled: !!gameId && !makeMove.isPending, // Disable polling while making a move to prevent rubber-banding
       refetchInterval: (query: any) => {
         const status = query.state.data?.status;
         if (status === 'active') return 2000;    // 2s fallback when playing
@@ -195,8 +197,6 @@ export default function Game() {
       },
     }
   });
-
-  const makeMove = useMakeMove();
   const resignGame = useResignGame();
   const offerDraw = useOfferDraw();
 
@@ -225,7 +225,11 @@ export default function Game() {
       es.onmessage = (event) => {
         try {
           const updatedGame = JSON.parse(event.data);
-          queryClient.setQueryData(getGetGameQueryKey(gameId), updatedGame);
+          const currentGame = queryClient.getQueryData<any>(getGetGameQueryKey(gameId));
+          // Ignore SSE updates that are older than our optimistic state
+          if (!currentGame || !currentGame.moves || !updatedGame.moves || updatedGame.moves.length >= currentGame.moves.length) {
+            queryClient.setQueryData(getGetGameQueryKey(gameId), updatedGame);
+          }
         } catch { /* ignore malformed data */ }
       };
 
@@ -397,6 +401,9 @@ export default function Game() {
         const newFen = chess.fen();
         // Update local chess state speculatively
         setChess(new Chess(newFen));
+
+        // Cancel any in-flight polls so they don't return old state and cause rubber-banding
+        queryClient.cancelQueries({ queryKey: getGetGameQueryKey(gameId) });
 
         // Create an optimistic game object so the whole UI (MoveHistory, lastMove highlights) updates instantly
         const optimisticGame = {
