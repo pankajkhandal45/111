@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
+import { getGetMeQueryKey } from '@workspace/api-client-react';
 import { Loader2, User, Lock, Globe, Trash2, Upload, X } from 'lucide-react';
 
 export default function Settings() {
@@ -75,7 +76,7 @@ export default function Settings() {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || 'Update failed');
       }
-      queryClient.invalidateQueries({ queryKey: ['me'] });
+      queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
       toast({ title: 'Profile updated successfully!' });
     } catch (err: any) {
       toast({ title: err.message, variant: 'destructive' });
@@ -98,11 +99,28 @@ export default function Settings() {
     }
     setIsUploadingImage(true);
     try {
+      // Compress image using canvas before uploading (keeps base64 under ~50KB)
       const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(file);
+        img.onload = () => {
+          URL.revokeObjectURL(objectUrl);
+          const MAX = 200;
+          let { width, height } = img;
+          if (width > height) {
+            if (width > MAX) { height = Math.round(height * MAX / width); width = MAX; }
+          } else {
+            if (height > MAX) { width = Math.round(width * MAX / height); height = MAX; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d')!;
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.75));
+        };
+        img.onerror = reject;
+        img.src = objectUrl;
       });
       // Update local preview immediately
       setProfileForm(f => ({ ...f, avatar: base64 }));
@@ -113,7 +131,13 @@ export default function Settings() {
         body: JSON.stringify({ avatar: base64 }),
       });
       if (!res.ok) throw new Error('Upload failed');
-      queryClient.invalidateQueries({ queryKey: ['me'] });
+      const updatedUser = await res.json().catch(() => null);
+      // Instantly update cache so avatar reflects everywhere without reload
+      if (updatedUser) {
+        queryClient.setQueryData(getGetMeQueryKey(), updatedUser);
+      }
+      // Also invalidate to force a fresh fetch in background
+      queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
       toast({ title: '✅ Profile photo update ho gayi!' });
     } catch (err: any) {
       toast({ title: err.message || 'Upload failed', variant: 'destructive' });
