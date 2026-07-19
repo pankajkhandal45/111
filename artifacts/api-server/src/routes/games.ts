@@ -32,6 +32,30 @@ function pushGameUpdate(gameId: number, gameData: unknown) {
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─── Chat SSE Registry ───────────────────────────────────────────────────────
+// Maps gameId → Set of SSE response objects for chat stream
+const chatClients = new Map<number, Set<Response>>();
+
+function addChatClient(gameId: number, res: Response) {
+  if (!chatClients.has(gameId)) chatClients.set(gameId, new Set());
+  chatClients.get(gameId)!.add(res);
+}
+
+function removeChatClient(gameId: number, res: Response) {
+  chatClients.get(gameId)?.delete(res);
+  if (chatClients.get(gameId)?.size === 0) chatClients.delete(gameId);
+}
+
+function pushChatMessage(gameId: number, message: unknown) {
+  const clients = chatClients.get(gameId);
+  if (!clients || clients.size === 0) return;
+  const payload = `data: ${JSON.stringify(message)}\n\n`;
+  for (const client of clients) {
+    try { client.write(payload); } catch { /* client already disconnected */ }
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 const TIME_CONTROL_MS: Record<string, number | null> = {
   bullet1: 60000,
   bullet2: 120000,
@@ -408,6 +432,63 @@ router.post("/games/:id/draw", requireAuth, async (req: AuthRequest, res) => {
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Failed to offer draw" });
+  }
+});
+
+// GET /api/games/:id/chat/events — SSE stream for real-time chat
+router.get("/games/:id/chat/events", requireAuth, async (req: AuthRequest, res) => {
+  const gameId = parseInt(req.params.id);
+  if (isNaN(gameId)) { res.status(400).end(); return; }
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders();
+
+  const keepAlive = setInterval(() => {
+    try { res.write(": ping\n\n"); } catch { /* ignore */ }
+  }, 25000);
+
+  addChatClient(gameId, res);
+
+  req.on("close", () => {
+    clearInterval(keepAlive);
+    removeChatClient(gameId, res);
+  });
+});
+
+// POST /api/games/:id/chat — Send a chat message
+router.post("/games/:id/chat", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const gameId = parseInt(req.params.id);
+    if (isNaN(gameId)) { res.status(400).json({ error: "Invalid game id" }); return; }
+
+    const { text } = req.body;
+    if (!text || typeof text !== "string" || !text.trim()) {
+      res.status(400).json({ error: "Message text is required" }); return;
+    }
+
+    const userId = req.userId!;
+    // Fetch sender username
+    const [sender] = await db.select({ id: usersTable.id, username: usersTable.username, avatar: usersTable.avatar })
+      .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+
+    const message = {
+      id: Date.now(),
+      gameId,
+      senderId: userId,
+      senderName: sender?.username || "Player",
+      senderAvatar: sender?.avatar || null,
+      text: text.trim().substring(0, 300),
+      createdAt: new Date().toISOString(),
+    };
+
+    pushChatMessage(gameId, message);
+    res.json(message);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Failed to send message" });
   }
 });
 

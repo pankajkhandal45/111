@@ -9,6 +9,7 @@ interface MoveHistoryProps {
 }
 
 export function MoveHistory({ moves = [], onMoveClick, activeMoveIndex }: MoveHistoryProps) {
+  const [open, setOpen] = React.useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when new moves arrive
@@ -42,62 +43,101 @@ export function MoveHistory({ moves = [], onMoveClick, activeMoveIndex }: MoveHi
   });
 
   return (
-    <div className="flex flex-col h-full bg-card rounded-md border shadow-sm overflow-hidden">
-      <div className="px-4 py-2 border-b bg-muted/50 font-semibold text-sm">
-        Move History
-      </div>
-      <div 
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto p-2"
+    <div className="flex flex-col bg-card rounded-md border shadow-sm overflow-hidden">
+      {/* ── Collapsible Header ── */}
+      <button
+        className="flex items-center justify-between px-4 py-2.5 bg-muted/50 hover:bg-muted transition-colors cursor-pointer w-full text-left border-b"
+        onClick={() => setOpen(o => !o)}
       >
-        <table className="w-full text-sm text-left">
-          <tbody>
-            {pairedMoves.map((pair, idx) => (
-              <tr key={pair.moveNumber} className={cn(
-                "border-b border-border/40 last:border-0",
-                idx % 2 === 0 ? "bg-card" : "bg-muted/20"
-              )}>
-                <td className="py-1 px-2 text-muted-foreground w-8 select-none">
-                  {pair.pairNumber}.
-                </td>
-                <td className="py-1 px-2">
-                  {pair.white && (
-                    <span 
-                      className={cn(
-                        "cursor-pointer hover:bg-accent hover:text-accent-foreground px-1 rounded transition-colors",
-                        activeMoveIndex === (pair.white.moveNumber - 1) && "bg-primary text-primary-foreground hover:bg-primary/90"
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold">Move History</span>
+          {!open && moves.length > 0 && (
+            <span className="bg-primary text-primary-foreground text-xs rounded-full px-1.5 py-0.5 font-bold leading-none">
+              {moves.length}
+            </span>
+          )}
+        </div>
+        <span
+          className="text-xs text-muted-foreground transition-transform duration-200"
+          style={{ display: 'inline-block', transform: open ? 'rotate(0deg)' : 'rotate(-90deg)' }}
+        >
+          ▼
+        </span>
+      </button>
+
+      {/* ── Move Table ── */}
+      {open && (
+        <div className="relative">
+          {/* Scroll container — fixed height, always scrollable */}
+          <div
+            ref={scrollRef}
+            className="overflow-y-auto p-2"
+            style={{
+              height: '260px',
+              scrollbarWidth: 'thin',
+              scrollbarColor: 'hsl(var(--border)) transparent',
+            }}
+          >
+            <table className="w-full text-sm text-left">
+              <tbody>
+                {pairedMoves.map((pair, idx) => (
+                  <tr key={pair.pairNumber} className={cn(
+                    "border-b border-border/40 last:border-0",
+                    idx % 2 === 0 ? "bg-card" : "bg-muted/20"
+                  )}>
+                    <td className="py-1 px-2 text-muted-foreground w-8 select-none font-mono text-xs">
+                      {pair.pairNumber}.
+                    </td>
+                    <td className="py-1 px-2">
+                      {pair.white && (
+                        <span
+                          className={cn(
+                            "cursor-pointer hover:bg-accent hover:text-accent-foreground px-1.5 py-0.5 rounded transition-colors font-medium",
+                            activeMoveIndex === (pair.white.moveNumber - 1) && "bg-primary text-primary-foreground hover:bg-primary/90"
+                          )}
+                          onClick={() => onMoveClick?.(pair.white!.moveNumber - 1)}
+                        >
+                          {pair.white.san}
+                        </span>
                       )}
-                      onClick={() => onMoveClick?.(pair.white!.moveNumber - 1)}
-                    >
-                      {pair.white.san}
-                    </span>
-                  )}
-                </td>
-                <td className="py-1 px-2">
-                  {pair.black && (
-                    <span 
-                      className={cn(
-                        "cursor-pointer hover:bg-accent hover:text-accent-foreground px-1 rounded transition-colors",
-                        activeMoveIndex === (pair.black.moveNumber - 1) && "bg-primary text-primary-foreground hover:bg-primary/90"
+                    </td>
+                    <td className="py-1 px-2">
+                      {pair.black && (
+                        <span
+                          className={cn(
+                            "cursor-pointer hover:bg-accent hover:text-accent-foreground px-1.5 py-0.5 rounded transition-colors font-medium",
+                            activeMoveIndex === (pair.black.moveNumber - 1) && "bg-primary text-primary-foreground hover:bg-primary/90"
+                          )}
+                          onClick={() => onMoveClick?.(pair.black!.moveNumber - 1)}
+                        >
+                          {pair.black.san}
+                        </span>
                       )}
-                      onClick={() => onMoveClick?.(pair.black!.moveNumber - 1)}
-                    >
-                      {pair.black.san}
-                    </span>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {moves.length === 0 && (
-              <tr>
-                <td colSpan={3} className="py-4 text-center text-muted-foreground italic">
-                  No moves yet
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                    </td>
+                  </tr>
+                ))}
+                {moves.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="py-8 text-center text-muted-foreground italic text-xs">
+                      No moves yet
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Bottom fade — hints that more moves are below */}
+          {pairedMoves.length > 7 && (
+            <div
+              className="absolute bottom-0 left-0 right-0 h-6 pointer-events-none"
+              style={{
+                background: 'linear-gradient(to bottom, transparent, hsl(var(--card)))',
+              }}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }

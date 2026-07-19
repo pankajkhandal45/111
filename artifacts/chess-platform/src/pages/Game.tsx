@@ -3,13 +3,216 @@ import { useLocation, useParams } from 'wouter';
 import { ChessBoard } from '@/components/ChessBoard';
 import { GameClock } from '@/components/GameClock';
 import { MoveHistory } from '@/components/MoveHistory';
+import { VoiceChat } from '@/components/VoiceChat';
 import { useGetGame, useMakeMove, useResignGame, useOfferDraw, getGetGameQueryKey, getBaseUrl, type Game } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/context/AuthContext';
-import { Loader2, Flag, Handshake, Home, Trophy, Minus, ArrowUpDown } from 'lucide-react';
+import { Loader2, Flag, Handshake, Home, Trophy, Minus, ArrowUpDown, Send, MessageCircle } from 'lucide-react';
 import { Chess } from 'chess.js';
+
+// ── Chat Types ───────────────────────────────────────────────────────────────
+interface ChatMessage {
+  id: number;
+  gameId: number;
+  senderId: number;
+  senderName: string;
+  senderAvatar: string | null;
+  text: string;
+  createdAt: string;
+}
+
+// ── ChatPanel Component ───────────────────────────────────────────────────────
+function ChatPanel({ gameId, currentUser, opponentName }: {
+  gameId: number;
+  currentUser: any;
+  opponentName: string;
+}) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState('');
+  const [sending, setSending] = useState(false);
+  const [unread, setUnread] = useState(0);
+  const [open, setOpen] = useState(true);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const chatSseRef = useRef<EventSource | null>(null);
+  const chatReconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // SSE connection for chat
+  useEffect(() => {
+    let cancelled = false;
+
+    function connectChat() {
+      if (cancelled) return;
+      const token = localStorage.getItem('chess_token');
+      const qs = token ? `?token=${encodeURIComponent(token)}` : '';
+      const base = getBaseUrl();
+      const url = base
+        ? `${base}/api/games/${gameId}/chat/events${qs}`
+        : `/api/games/${gameId}/chat/events${qs}`;
+
+      const es = new EventSource(url);
+      chatSseRef.current = es;
+
+      es.onmessage = (event) => {
+        try {
+          const msg: ChatMessage = JSON.parse(event.data);
+          setMessages(prev => [...prev, msg]);
+          if (!open) setUnread(n => n + 1);
+        } catch { /* ignore */ }
+      };
+
+      es.onerror = () => {
+        es.close();
+        chatSseRef.current = null;
+        if (!cancelled) {
+          chatReconnectRef.current = setTimeout(connectChat, 3000);
+        }
+      };
+    }
+
+    connectChat();
+    return () => {
+      cancelled = true;
+      if (chatReconnectRef.current) clearTimeout(chatReconnectRef.current);
+      chatSseRef.current?.close();
+      chatSseRef.current = null;
+    };
+  }, [gameId]);
+
+  // Auto-scroll to latest message
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Clear unread when opened
+  useEffect(() => {
+    if (open) setUnread(0);
+  }, [open]);
+
+  async function sendMessage() {
+    const text = input.trim();
+    if (!text || sending) return;
+    setSending(true);
+    setInput('');
+    try {
+      const token = localStorage.getItem('chess_token');
+      const base = getBaseUrl();
+      const url = base ? `${base}/api/games/${gameId}/chat` : `/api/games/${gameId}/chat`;
+      await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ text }),
+      });
+    } catch { /* ignore */ }
+    setSending(false);
+  }
+
+  function onKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }
+
+  const QUICK_EMOJIS = ['👍','😊','😅','🎉','🤝','😱','🔥','♟️'];
+
+  return (
+    <div className="flex flex-col border border-border rounded-xl overflow-hidden" style={{ height: open ? '340px' : 'auto' }}>
+      {/* Header */}
+      <button
+        className="flex items-center justify-between px-4 py-2.5 bg-muted/60 hover:bg-muted transition-colors cursor-pointer w-full text-left"
+        onClick={() => setOpen(o => !o)}
+      >
+        <div className="flex items-center gap-2">
+          <MessageCircle className="w-4 h-4 text-primary" />
+          <span className="text-sm font-semibold">Chat</span>
+          {!open && unread > 0 && (
+            <span className="bg-primary text-primary-foreground text-xs rounded-full px-1.5 py-0.5 font-bold">{unread}</span>
+          )}
+        </div>
+        <span className="text-xs text-muted-foreground">{open ? '▼' : '▶'}</span>
+      </button>
+
+      {open && (
+        <>
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2 bg-background/50" style={{ minHeight: 0 }}>
+            {messages.length === 0 && (
+              <div className="text-center text-muted-foreground text-xs py-6">
+                <MessageCircle className="w-6 h-6 mx-auto mb-2 opacity-40" />
+                <p>Koi message nahi abhi.</p>
+                <p className="mt-0.5">Friend ko "Hi" kaho! 👋</p>
+              </div>
+            )}
+            {messages.map((msg) => {
+              const isMe = msg.senderId === currentUser?.id;
+              return (
+                <div key={msg.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                  <Avatar className="h-6 w-6 flex-shrink-0 mt-0.5">
+                    <AvatarImage src={msg.senderAvatar || undefined} />
+                    <AvatarFallback className="text-[10px]">{msg.senderName.substring(0, 2).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <div className={`max-w-[75%] ${isMe ? 'items-end' : 'items-start'} flex flex-col gap-0.5`}>
+                    <div
+                      className={`px-3 py-1.5 rounded-2xl text-sm leading-snug break-words ${
+                        isMe
+                          ? 'bg-primary text-primary-foreground rounded-tr-sm'
+                          : 'bg-muted text-foreground rounded-tl-sm'
+                      }`}
+                    >
+                      {msg.text}
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">
+                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+            <div ref={bottomRef} />
+          </div>
+
+          {/* Quick Emojis */}
+          <div className="flex gap-1 px-3 py-1 bg-muted/30 border-t border-border overflow-x-auto">
+            {QUICK_EMOJIS.map(emoji => (
+              <button
+                key={emoji}
+                className="text-base hover:scale-125 transition-transform flex-shrink-0"
+                onClick={() => setInput(prev => prev + emoji)}
+              >{emoji}</button>
+            ))}
+          </div>
+
+          {/* Input */}
+          <div className="flex gap-2 px-3 py-2 bg-muted/20 border-t border-border">
+            <input
+              type="text"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={onKeyDown}
+              placeholder={`Message ${opponentName}…`}
+              maxLength={300}
+              className="flex-1 bg-background border border-border rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-primary transition-all"
+            />
+            <Button
+              size="sm"
+              className="px-3 flex-shrink-0"
+              onClick={sendMessage}
+              disabled={!input.trim() || sending}
+            >
+              {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 
 // ── Game Over Modal ───────────────────────────────────────────────────────────
 function GameOverModal({ game, currentUserId, onClose }: {
@@ -564,10 +767,42 @@ export default function Game() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 h-full">
-        <div className="flex-1 min-h-[300px]">
-          <MoveHistory moves={game.moves} />
-        </div>
+      <div className="flex flex-col gap-4">
+        <MoveHistory moves={game.moves} />
+
+        {/* In-game Chat — show in private/online matches */}
+        {(game.mode === 'private' || game.mode === 'online') && isPlaying && (
+          <ChatPanel
+            gameId={gameId}
+            currentUser={user}
+            opponentName={
+              isWhite
+                ? ((game as any).blackPlayer?.username || 'Opponent')
+                : ((game as any).whitePlayer?.username || 'Opponent')
+            }
+          />
+        )}
+
+        {/* In-game Voice Chat — private/online matches only */}
+        {(game.mode === 'private' || game.mode === 'online') && isPlaying && (
+          <VoiceChat
+            gameId={gameId}
+            myColor={isWhite ? 'white' : 'black'}
+            myName={user?.username || 'Me'}
+            myAvatar={user?.avatar ?? null}
+            opponentName={
+              isWhite
+                ? ((game as any).blackPlayer?.username || 'Opponent')
+                : ((game as any).whitePlayer?.username || 'Opponent')
+            }
+            opponentAvatar={
+              isWhite
+                ? ((game as any).blackPlayer?.avatar ?? null)
+                : ((game as any).whitePlayer?.avatar ?? null)
+            }
+            gameActive={game.status === 'active'}
+          />
+        )}
 
         {game.status === 'active' && isPlaying && (
           <div className="flex flex-col gap-2">
