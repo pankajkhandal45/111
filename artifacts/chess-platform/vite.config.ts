@@ -78,14 +78,18 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+    sourcemap: false,
+    cssCodeSplit: true,
+    chunkSizeWarningLimit: 600,
+    minify: 'esbuild',
     rollupOptions: {
       output: {
         manualChunks(id) {
-          // React core — must be a single shared chunk so hooks work correctly
+          // React core — single shared chunk so hooks work correctly
           if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/') || id.includes('node_modules/scheduler/')) {
             return 'react-vendor';
           }
-          // Framer Motion is ~100 KB on its own — split it out
+          // Framer Motion ~100 KB
           if (id.includes('node_modules/framer-motion/')) {
             return 'framer-motion';
           }
@@ -101,13 +105,29 @@ export default defineConfig({
           if (id.includes('node_modules/@radix-ui/')) {
             return 'ui-radix';
           }
+          // Recharts (heavy — split out)
+          if (id.includes('node_modules/recharts/') || id.includes('node_modules/d3') || id.includes('node_modules/victory')) {
+            return 'charts';
+          }
+          // Lucide icons
+          if (id.includes('node_modules/lucide-react/')) {
+            return 'icons';
+          }
+          // PeerJS (WebRTC — only needed in game page)
+          if (id.includes('node_modules/peerjs/') || id.includes('node_modules/webrtc')) {
+            return 'webrtc';
+          }
+          // Zod + form libs
+          if (id.includes('node_modules/zod/') || id.includes('node_modules/react-hook-form/') || id.includes('node_modules/@hookform/')) {
+            return 'forms';
+          }
           // Wouter router
           if (id.includes('node_modules/wouter/')) {
             return 'router';
           }
-          // date-fns / other formatting utils
-          if (id.includes('node_modules/date-fns/') || id.includes('node_modules/clsx/') || id.includes('node_modules/class-variance-authority/')) {
-            return 'format';
+          // Utils
+          if (id.includes('node_modules/date-fns/') || id.includes('node_modules/clsx/') || id.includes('node_modules/class-variance-authority/') || id.includes('node_modules/tailwind-merge/')) {
+            return 'utils';
           }
         },
       },

@@ -3,26 +3,39 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    <title>Chess Platform</title>
-    <meta name="description" content="Chess Platform — built on Replit. Update this description to reflect the app." />
+    <title>ChessHub – Play Chess Online</title>
+    <meta name="description" content="ChessHub – Play chess online with friends. Private matches, puzzles, leaderboard and more." />
     <meta name="robots" content="index, follow" />
-    <meta property="og:title" content="Chess Platform" />
-    <meta property="og:description" content="Chess Platform — built on Replit. Update this description to reflect the app." />
+    <meta property="og:title" content="ChessHub – Play Chess Online" />
+    <meta property="og:description" content="Play chess online with friends. Private matches, voice chat, puzzles and more." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Chess Platform" />
-    <meta name="twitter:description" content="Chess Platform — built on Replit. Update this description to reflect the app." />
+    <meta name="twitter:title" content="ChessHub – Play Chess Online" />
+    <meta name="twitter:description" content="Play chess online with friends. Private matches, voice chat, puzzles and more." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/image.png" />
-    <meta name="theme-color" content="#ffffff" />
-    <link rel="preconnect" href="https://chesshub-fzpb.onrender.com">
-    <link rel="dns-prefetch" href="https://chesshub-fzpb.onrender.com">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <meta name="theme-color" content="#0f172a" />
+
+    <!-- API backend: preconnect for faster first request -->
+    <link rel="preconnect" href="https://chesshub-fzpb.onrender.com" crossorigin />
+    <link rel="dns-prefetch" href="https://chesshub-fzpb.onrender.com" />
+
+    <!-- Google Fonts: non-blocking load (render-blocking fix) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+    </noscript>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
+

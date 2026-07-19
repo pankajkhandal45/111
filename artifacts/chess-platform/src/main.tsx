@@ -14,4 +14,16 @@ if (apiUrl) {
   setBaseUrl(apiUrl);
 }
 
+// ── Backend warm-up ping ──────────────────────────────────────────────────────
+// Render.com free tier sleeps after ~15 min of inactivity.
+// This silent ping fires immediately so the server is awake by the time
+// the user makes a real request (login, game load, etc.)
+const backendBase = apiUrl || '';
+fetch(`${backendBase}/api/health`, {
+  method: 'GET',
+  cache: 'no-store',
+  signal: AbortSignal.timeout(8000),
+}).catch(() => { /* intentionally silent — server may be starting up */ });
+// ─────────────────────────────────────────────────────────────────────────────
+
 createRoot(document.getElementById("root")!).render(<App />);
