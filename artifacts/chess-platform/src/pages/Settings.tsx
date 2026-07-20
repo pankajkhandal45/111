@@ -251,7 +251,7 @@ export default function Settings() {
               <div className="flex-1 space-y-2">
                 <div>
                   <p className="text-sm font-medium">Profile Photo</p>
-                  <p className="text-xs text-muted-foreground">Photo par click karke local image upload karo (max 2MB)</p>
+                  <p className="text-xs text-muted-foreground">Upload a local image by clicking on the photo. (max 2MB)</p>
                 </div>
                 <Button
                   type="button"
@@ -263,13 +263,13 @@ export default function Settings() {
                 >
                   {isUploadingImage
                     ? <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Uploading...</>
-                    : <><Upload className="mr-2 h-3 w-3" />Device se photo choose karo</>}
+                    : <><Upload className="mr-2 h-3 w-3" />choose Image</>}
                 </Button>
                 {/* Optional: manual URL override */}
                 {profileForm.avatar && !profileForm.avatar.startsWith('data:') && (
                   <div className="flex items-center gap-1">
                     <Input
-                      placeholder="Ya avatar URL paste karo"
+                      placeholder="Paste your avatar URL here"
                       value={profileForm.avatar}
                       onChange={e => setProfileForm(f => ({ ...f, avatar: e.target.value }))}
                       className="text-xs h-7"
@@ -283,7 +283,7 @@ export default function Settings() {
                 {profileForm.avatar && (
                   <Button type="button" variant="ghost" size="sm" className="text-xs text-muted-foreground h-6 px-2"
                     onClick={() => setProfileForm(f => ({ ...f, avatar: '' }))}>
-                    <X className="h-3 w-3 mr-1" /> Photo hatao
+                    <X className="h-3 w-3 mr-1" /> Remove Image
                   </Button>
                 )}
               </div>
