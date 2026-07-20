@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useCreateGame } from '@workspace/api-client-react';
+import { useCreateGame, getBaseUrl } from '@workspace/api-client-react';
 import { useLocation, useSearch } from 'wouter';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -61,7 +61,8 @@ export default function Play() {
 
   const joinGameMutation = useMutation({
     mutationFn: async (code: string) => {
-      const res = await fetch('/api/games/join', {
+      const base = getBaseUrl().replace(/\/$/, '');
+      const res = await fetch(`${base}/api/games/join`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

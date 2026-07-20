@@ -5,8 +5,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/context/AuthContext";
 import { Layout } from "@/components/Layout";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+
+import { getBaseUrl } from "@workspace/api-client-react";
 
 const Home = lazy(() => import("@/pages/Home"));
 const Game = lazy(() => import("@/pages/Game"));
@@ -34,8 +37,9 @@ const queryClient = new QueryClient({
       retry: 1,
       retryDelay: 2000,
       refetchOnWindowFocus: false,
-      staleTime: 30_000,       // cached data stays fresh for 30s
-      gcTime: 5 * 60 * 1000,  // garbage collect after 5 min
+      refetchOnMount: false,
+      staleTime: 60_000,       // 60s tak same data reuse karo
+      gcTime: 10 * 60 * 1000, // 10 min cache
       networkMode: 'online',
     },
     mutations: {
@@ -43,6 +47,36 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// Shows a toast if backend takes >3s to respond (Render.com cold start)
+function BackendWatcher() {
+  const { toast } = useToast();
+  const shown = useRef(false);
+
+  useEffect(() => {
+    if (shown.current) return;
+    const timer = setTimeout(() => {
+      const base = getBaseUrl();
+      const url = base ? `${base}/api/healthz` : '/api/healthz';
+      // If healthz hasn't responded in 3s, show a warning
+      fetch(url, { method: 'GET', cache: 'no-store' })
+        .then(r => { if (!r.ok) throw new Error(); })
+        .catch(() => {
+          if (!shown.current) {
+            shown.current = true;
+            toast({
+              title: '⏳ Server shuru ho raha hai...',
+              description: 'Pehli baar thoda wait karo (~30 sec). Baad mein fast chalega.',
+              duration: 15000,
+            });
+          }
+        });
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return null;
+}
 
 function Router() {
   return (
@@ -75,6 +109,7 @@ function App() {
         <AuthProvider>
           <TooltipProvider>
             <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <BackendWatcher />
               <Router />
             </WouterRouter>
             <Toaster />

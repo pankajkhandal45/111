@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
+import { getBaseUrl } from '@workspace/api-client-react';
 
 export interface OnlineFriend {
   id: number;
@@ -16,7 +17,8 @@ export function useOnlineFriends() {
   return useQuery<OnlineFriend[]>({
     queryKey: ['friends', 'online'],
     queryFn: async () => {
-      const res = await fetch('/api/friends', {
+      const base = getBaseUrl().replace(/\/$/, '');
+      const res = await fetch(`${base}/api/friends`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) return [];
@@ -24,7 +26,7 @@ export function useOnlineFriends() {
       return all;
     },
     enabled: !!token,
-    refetchInterval: 30_000,
-    staleTime: 25_000,
+    refetchInterval: 2 * 60_000,  // har 2 min mein check karo (pehle 30s tha)
+    staleTime: 90_000,             // 90s tak cached data use karo
   });
 }

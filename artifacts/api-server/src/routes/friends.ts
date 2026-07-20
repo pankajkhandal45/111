@@ -14,8 +14,9 @@ router.get("/friends", requireAuth, async (req: AuthRequest, res) => {
       .where(or(eq(friendsTable.userId, userId), eq(friendsTable.friendId, userId)));
 
     const friendIds = friendRows.map(f => f.userId === userId ? f.friendId : f.userId);
+    const uniqueFriendIds = Array.from(new Set(friendIds));
 
-    const friends = await Promise.all(friendIds.map(async (fid) => {
+    const friends = await Promise.all(uniqueFriendIds.map(async (fid) => {
       const [user] = await db.select().from(usersTable).where(eq(usersTable.id, fid)).limit(1);
       const [rating] = await db.select().from(ratingsTable).where(eq(ratingsTable.userId, fid)).limit(1);
       return {

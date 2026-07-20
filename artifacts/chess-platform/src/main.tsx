@@ -1,29 +1,39 @@
 import { registerSW } from 'virtual:pwa-register';
 import { createRoot } from "react-dom/client";
-
-registerSW({ immediate: true });
 import App from "./App";
 import "./index.css";
 import { setBaseUrl } from "@workspace/api-client-react";
 
-// Only set a base URL when explicitly configured (e.g. for native mobile builds).
-// In web builds (Replit preview, Vercel) API calls use relative paths so the
-// platform proxy (Replit path-router or vercel.json rewrite) handles routing.
-const apiUrl = import.meta.env.VITE_API_URL;
+registerSW({ immediate: true });
+
+const apiUrl = import.meta.env.VITE_API_URL || 
+  (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? '' 
+    : 'https://chesshub-fzpb.onrender.com');
+
 if (apiUrl) {
   setBaseUrl(apiUrl);
 }
 
-// ── Backend warm-up ping ──────────────────────────────────────────────────────
-// Render.com free tier sleeps after ~15 min of inactivity.
-// This silent ping fires immediately so the server is awake by the time
-// the user makes a real request (login, game load, etc.)
-const backendBase = apiUrl || '';
-fetch(`${backendBase}/api/health`, {
-  method: 'GET',
-  cache: 'no-store',
-  signal: AbortSignal.timeout(8000),
-}).catch(() => { /* intentionally silent — server may be starting up */ });
+// ── Backend warm-up (Render.com free tier cold start fix) ────────────────────
+// Fire immediately so backend is warm before user interacts.
+const HEALTH_URL = apiUrl ? `${apiUrl}/api/healthz` : '/api/healthz';
+
+async function wakeBackend(retries = 3): Promise<void> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const ctrl = new AbortController();
+      const timeout = setTimeout(() => ctrl.abort(), 8000);
+      const res = await fetch(HEALTH_URL, { method: 'GET', cache: 'no-store', signal: ctrl.signal });
+      clearTimeout(timeout);
+      if (res.ok) return; // server is up!
+    } catch {
+      // server sleeping or slow — wait 5s then retry
+      if (i < retries - 1) await new Promise(r => setTimeout(r, 5000));
+    }
+  }
+}
+wakeBackend();
 // ─────────────────────────────────────────────────────────────────────────────
 
 createRoot(document.getElementById("root")!).render(<App />);

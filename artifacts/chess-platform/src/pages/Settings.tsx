@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
-import { getGetMeQueryKey } from '@workspace/api-client-react';
+import { getGetMeQueryKey, getBaseUrl } from '@workspace/api-client-react';
 import { Loader2, User, Lock, Globe, Trash2, Upload, X } from 'lucide-react';
 
 export default function Settings() {
@@ -61,8 +61,9 @@ export default function Settings() {
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
     setIsSavingProfile(true);
+    const base = getBaseUrl().replace(/\/$/, '');
     try {
-      const res = await fetch('/api/users/me', {
+      const res = await fetch(`${base}/api/users/me`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -124,8 +125,9 @@ export default function Settings() {
       });
       // Update local preview immediately
       setProfileForm(f => ({ ...f, avatar: base64 }));
+      const base = getBaseUrl().replace(/\/$/, '');
       // Save to server right away
-      const res = await fetch('/api/users/me', {
+      const res = await fetch(`${base}/api/users/me`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ avatar: base64 }),
@@ -158,8 +160,9 @@ export default function Settings() {
       return;
     }
     setIsSavingPassword(true);
+    const base = getBaseUrl().replace(/\/$/, '');
     try {
-      const res = await fetch('/api/users/me/password', {
+      const res = await fetch(`${base}/api/users/me/password`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -182,8 +185,9 @@ export default function Settings() {
 
   async function deleteAccount() {
     if (!confirm('Are you sure? This will permanently delete your account and all data.')) return;
+    const base = getBaseUrl().replace(/\/$/, '');
     try {
-      const res = await fetch('/api/users/me', {
+      const res = await fetch(`${base}/api/users/me`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });

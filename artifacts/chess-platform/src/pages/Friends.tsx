@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useGetFriends, useGetFriendRequests, useSendFriendRequest, useAcceptFriendRequest, useDeclineFriendRequest } from '@workspace/api-client-react';
+import { useGetFriends, useGetFriendRequests, useSendFriendRequest, useAcceptFriendRequest, useDeclineFriendRequest, getBaseUrl } from '@workspace/api-client-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { useAuth } from '@/context/AuthContext';
 
 export default function Friends() {
   const { token } = useAuth();
-  const { data: friends, isLoading: isFriendsLoading } = useGetFriends({ query: { refetchInterval: 30_000 } });
+  const { data: friends, isLoading: isFriendsLoading } = useGetFriends({ query: { refetchInterval: 60_000 } });
   const { data: requests, isLoading: isRequestsLoading } = useGetFriendRequests();
   
   const queryClient = useQueryClient();
@@ -20,7 +20,8 @@ export default function Friends() {
   const { data: sentRequests } = useQuery({
     queryKey: ['sentFriendRequests'],
     queryFn: async () => {
-      const res = await fetch('/api/friends/requests/sent', {
+      const base = getBaseUrl().replace(/\/$/, '');
+      const res = await fetch(`${base}/api/friends/requests/sent`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) throw new Error('Failed to fetch');
@@ -31,7 +32,8 @@ export default function Friends() {
 
   const cancelRequest = useMutation({
     mutationFn: async (id: number) => {
-      const res = await fetch(`/api/friends/requests/${id}/cancel`, {
+      const base = getBaseUrl().replace(/\/$/, '');
+      const res = await fetch(`${base}/api/friends/requests/${id}/cancel`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });

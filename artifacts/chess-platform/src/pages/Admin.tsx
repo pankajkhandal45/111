@@ -10,13 +10,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Users, Gamepad2, Trophy, Sword, Trash2, ShieldCheck, ShieldOff, Activity } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { getBaseUrl } from '@workspace/api-client-react';
 
 function useAdminQuery<T>(path: string) {
   const token = localStorage.getItem('chess_token');
   return useQuery<T>({
     queryKey: ['admin', path],
     queryFn: async () => {
-      const res = await fetch(`/api/${path}`, {
+      const base = getBaseUrl().replace(/\/$/, '');
+      const res = await fetch(`${base}/api/${path}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Failed');
@@ -29,7 +31,8 @@ function useAdminMutation(method: string, path: string) {
   const token = localStorage.getItem('chess_token');
   return useMutation({
     mutationFn: async (body?: unknown) => {
-      const res = await fetch(`/api/${path}`, {
+      const base = getBaseUrl().replace(/\/$/, '');
+      const res = await fetch(`${base}/api/${path}`, {
         method,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: body ? JSON.stringify(body) : undefined,
@@ -95,7 +98,8 @@ export default function Admin() {
 
   const changeRole = useMutation({
     mutationFn: async ({ id, role }: { id: number; role: string }) => {
-      const res = await fetch(`/api/admin/users/${id}/role`, {
+      const base = getBaseUrl().replace(/\/$/, '');
+      const res = await fetch(`${base}/api/admin/users/${id}/role`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ role }),
@@ -115,7 +119,8 @@ export default function Admin() {
 
   const deleteUser = useMutation({
     mutationFn: async (id: number) => {
-      const res = await fetch(`/api/admin/users/${id}`, {
+      const base = getBaseUrl().replace(/\/$/, '');
+      const res = await fetch(`${base}/api/admin/users/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
