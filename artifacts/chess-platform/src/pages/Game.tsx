@@ -224,11 +224,38 @@ function GameOverModal({ game, currentUserId, onClose }: {
 
   const isDraw = game.result === 'draw';
   const winnerIsWhite = game.result === 'white';
-  const whitePlayer = game.whitePlayer;
-  const blackPlayer = game.blackPlayer;
+  const isLocal = game.mode === 'local';
+
+  // For local play, determine who was White vs Black based on flipped logic
+  const flipped = isLocal ? (game.id % 2 === 1) : false;
+
+  let whitePlayer = { ...game.whitePlayer };
+  let blackPlayer = { ...game.blackPlayer };
+
+  if (isLocal) {
+    if (flipped) {
+      whitePlayer = { id: -2, username: 'Player 2', avatar: null };
+      blackPlayer = { ...game.blackPlayer, username: game.blackPlayer?.username || 'Player 1' };
+    } else {
+      whitePlayer = { ...game.whitePlayer, username: game.whitePlayer?.username || 'Player 1' };
+      blackPlayer = { id: -2, username: 'Player 2', avatar: null };
+    }
+  }
+
   const winnerPlayer = isDraw ? null : (winnerIsWhite ? whitePlayer : blackPlayer);
   const loserPlayer  = isDraw ? null : (winnerIsWhite ? blackPlayer : whitePlayer);
-  const isMeWinner   = winnerPlayer?.id === currentUserId;
+  const isMeWinner   = !isLocal && winnerPlayer?.id === currentUserId;
+
+  let titleText = isDraw ? '🤝 Draw!' : isMeWinner ? '🎉 You Win!' : '😔 You Lose!';
+  if (isLocal) {
+    if (isDraw) {
+      titleText = '🤝 Draw!';
+    } else if (winnerPlayer?.id === currentUserId) {
+      titleText = '🎉 You Win!';
+    } else {
+      titleText = `🏆 ${winnerPlayer?.username || 'Winner'} Wins!`;
+    }
+  }
 
   const reasonMap: Record<string, string> = {
     checkmate:             'Checkmate',
@@ -297,7 +324,7 @@ function GameOverModal({ game, currentUserId, onClose }: {
         {/* Headline */}
         <div className="text-center">
           <h2 className="text-2xl font-extrabold tracking-tight">
-            {isDraw ? '🤝 Draw!' : isMeWinner ? '🎉 You Win!' : '😔 You Lose!'}
+            {titleText}
           </h2>
           <p className="text-muted-foreground text-xs mt-1">{reason}</p>
         </div>
