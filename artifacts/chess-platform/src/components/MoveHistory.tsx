@@ -9,7 +9,7 @@ interface MoveHistoryProps {
 }
 
 export function MoveHistory({ moves = [], onMoveClick, activeMoveIndex }: MoveHistoryProps) {
-  const [open, setOpen] = React.useState(true);
+  const [open, setOpen] = React.useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when new moves arrive
