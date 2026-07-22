@@ -29,7 +29,7 @@ router.get("/leaderboard", async (req, res) => {
       .limit(limit);
 
     // Get wins/losses/draws for each user
-    const entries = await Promise.all(users.map(async (u, i) => {
+    const rawEntries = await Promise.all(users.map(async (u) => {
       const games = await db.select().from(gamesTable).where(
         and(
           or(eq(gamesTable.whitePlayerId, u.id), eq(gamesTable.blackPlayerId, u.id)),
@@ -46,8 +46,10 @@ router.get("/leaderboard", async (req, res) => {
         else losses++;
       }
 
+      const totalGames = games.length;
+      const winRate = totalGames > 0 ? Math.round((wins / totalGames) * 1000) / 10 : 0;
+
       return {
-        rank: i + 1,
         userId: u.id,
         username: u.username,
         avatar: u.avatar ?? null,
@@ -56,8 +58,22 @@ router.get("/leaderboard", async (req, res) => {
         wins,
         losses,
         draws,
-        winRate: games.length > 0 ? Math.round((wins / games.length) * 1000) / 10 : 0,
+        totalGames,
+        winRate,
       };
+    }));
+
+    // Sort primarily by winRate desc, then wins desc, then rating desc
+    rawEntries.sort((a, b) => {
+      if (b.winRate !== a.winRate) return b.winRate - a.winRate;
+      if (b.wins !== a.wins) return b.wins - a.wins;
+      return b.rating - a.rating;
+    });
+
+    // Assign ranks based on win rate order
+    const entries = rawEntries.map((entry, index) => ({
+      rank: index + 1,
+      ...entry,
     }));
 
     res.json(entries);
