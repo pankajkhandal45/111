@@ -110,9 +110,43 @@ router.post("/auth/logout", requireAuth, async (req: AuthRequest, res) => {
 // POST /api/auth/heartbeat — marks user online, clears stale offline users
 router.post("/auth/heartbeat", requireAuth, async (req: AuthRequest, res) => {
   const now = new Date();
+  const userId = req.userId!;
+  const userWasOffline = !req.user?.isOnline;
+
   await db.update(usersTable)
     .set({ isOnline: true, lastSeen: now })
-    .where(eq(usersTable.id, req.userId!));
+    .where(eq(usersTable.id, userId));
+
+  // If user just came online, notify their friends
+  if (userWasOffline && req.user) {
+    try {
+      const { friendsTable, notificationsTable } = await import("@workspace/db");
+      const friendRows = await db.select().from(friendsTable)
+        .where(or(eq(friendsTable.userId, userId), eq(friendsTable.friendId, userId)));
+
+      const friendIds = Array.from(new Set(friendRows.map(f => f.userId === userId ? f.friendId : f.userId)));
+      const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000);
+
+      for (const fid of friendIds) {
+        const existing = await db.select().from(notificationsTable).where(
+          and(
+            eq(notificationsTable.userId, fid),
+            eq(notificationsTable.type, "friend_online"),
+            gt(notificationsTable.createdAt, tenMinutesAgo)
+          )
+        ).limit(1);
+
+        if (existing.length === 0) {
+          await db.insert(notificationsTable).values({
+            userId: fid,
+            type: "friend_online",
+            message: `🟢 ${req.user.username} is now online!`,
+            data: JSON.stringify({ friendId: userId, username: req.user.username, avatar: req.user.avatar }),
+          });
+        }
+      }
+    } catch { /* ignore error */ }
+  }
 
   // Mark users offline if no heartbeat for > 2 minutes
   const staleTime = new Date(now.getTime() - 2 * 60 * 1000);

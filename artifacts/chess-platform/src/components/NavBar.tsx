@@ -17,12 +17,19 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 
+import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
+import { getBaseUrl } from '@workspace/api-client-react';
+
 export function NavBar() {
   const { user, logout, isLoading } = useAuth();
   const [, setLocation] = useLocation();
   const { theme, setTheme } = useTheme();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const notifiedIdsRef = React.useRef<Set<number>>(new Set());
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: any) => {
@@ -47,11 +54,60 @@ export function NavBar() {
   };
 
   const { data: notifications } = useGetNotifications({
-    query: { enabled: !!user }
+    query: {
+      enabled: !!user,
+      refetchInterval: 3000,
+      staleTime: 0,
+      refetchOnWindowFocus: true,
+    }
   });
   const { data: friends } = useOnlineFriends();
 
-  const unreadCount = notifications?.filter(n => !n.isRead).length || 0;
+  // Toast alert when new unread notification arrives
+  useEffect(() => {
+    if (!notifications || notifications.length === 0) return;
+    notifications.forEach((n: any) => {
+      if (!n.isRead && !notifiedIdsRef.current.has(n.id)) {
+        notifiedIdsRef.current.add(n.id);
+        toast({
+          title: "🔔 Notification",
+          description: n.message,
+          duration: 6000,
+        });
+      }
+    });
+  }, [notifications]);
+
+  const handleMarkAllRead = async () => {
+    try {
+      const base = getBaseUrl();
+      const token = localStorage.getItem('chess_token');
+      await fetch(`${base || ''}/api/notifications/read-all`, {
+        method: 'POST',
+        headers: { Authorization: token ? `Bearer ${token}` : '' }
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+    } catch { /* ignore */ }
+  };
+
+  const handleNotificationClick = async (notif: any) => {
+    try {
+      const base = getBaseUrl();
+      const token = localStorage.getItem('chess_token');
+      await fetch(`${base || ''}/api/notifications/${notif.id}/read`, {
+        method: 'POST',
+        headers: { Authorization: token ? `Bearer ${token}` : '' }
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+      if (notif.type === 'friend_request') {
+        setLocation('/friends');
+      } else if (notif.type === 'friend_online' && notif.data?.username) {
+        setLocation(`/profile/${notif.data.username}`);
+      }
+    } catch { /* ignore */ }
+  };
+
+  const unreadCount = notifications?.filter((n: any) => !n.isRead).length || 0;
   const onlineCount = friends?.filter(f => f.isOnline).length || 0;
 
   const NavLinks = () => (
@@ -100,14 +156,56 @@ export function NavBar() {
 
           {user ? (
             <>
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="h-5 w-5" />
-                {unreadCount > 0 && (
-                  <Badge variant="destructive" className="absolute -top-1 -right-1 px-1 min-w-[1.25rem] h-5">
-                    {unreadCount}
-                  </Badge>
-                )}
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="relative cursor-pointer">
+                    <Bell className="h-5 w-5" />
+                    {unreadCount > 0 && (
+                      <Badge variant="destructive" className="absolute -top-1 -right-1 px-1 min-w-[1.25rem] h-5 animate-pulse">
+                        {unreadCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-80" align="end" forceMount>
+                  <div className="flex items-center justify-between px-3 py-2 border-b">
+                    <span className="font-semibold text-sm">Notifications</span>
+                    {unreadCount > 0 && (
+                      <Button variant="ghost" size="sm" className="text-xs h-7 text-primary hover:text-primary/80" onClick={handleMarkAllRead}>
+                        Mark all read
+                      </Button>
+                    )}
+                  </div>
+                  <div className="max-h-72 overflow-y-auto divide-y">
+                    {notifications && notifications.length > 0 ? (
+                      notifications.slice(0, 10).map((n: any) => (
+                        <div
+                          key={n.id}
+                          onClick={() => handleNotificationClick(n)}
+                          className={`p-3 text-xs flex items-start gap-3 cursor-pointer hover:bg-muted/50 transition-colors ${!n.isRead ? 'bg-primary/5 font-medium' : 'text-muted-foreground'}`}
+                        >
+                          <span className="text-base leading-none mt-0.5">
+                            {n.type === 'friend_request' ? '📩' : n.type === 'friend_online' ? '🟢' : '🔔'}
+                          </span>
+                          <div className="flex-1 space-y-0.5">
+                            <p className="text-foreground leading-snug">{n.message}</p>
+                            <span className="text-[10px] text-muted-foreground block">
+                              {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          {!n.isRead && (
+                            <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-1" />
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-6 text-center text-xs text-muted-foreground">
+                        No notifications yet
+                      </div>
+                    )}
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

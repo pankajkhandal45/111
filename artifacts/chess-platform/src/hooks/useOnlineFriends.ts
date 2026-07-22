@@ -26,7 +26,7 @@ export function useOnlineFriends() {
       return all;
     },
     enabled: !!token,
-    refetchInterval: 2 * 60_000,  // har 2 min mein check karo (pehle 30s tha)
-    staleTime: 90_000,             // 90s tak cached data use karo
+    refetchInterval: 5000,  // Check every 5 seconds for real-time online status
+    staleTime: 0,           // 0ms stale time so status updates immediately
   });
 }

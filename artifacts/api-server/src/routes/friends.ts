@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { friendRequestsTable, friendsTable, usersTable, ratingsTable } from "@workspace/db";
+import { friendRequestsTable, friendsTable, usersTable, ratingsTable, notificationsTable } from "@workspace/db";
 import { eq, and, or } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../lib/auth";
 
@@ -159,6 +159,14 @@ router.post("/friends/requests", requireAuth, async (req: AuthRequest, res) => {
 
     const [fromUser] = await db.select().from(usersTable).where(eq(usersTable.id, fromUserId)).limit(1);
 
+    // Send notification to recipient
+    await db.insert(notificationsTable).values({
+      userId: toUser.id,
+      type: "friend_request",
+      message: `📩 ${fromUser.username} sent you a friend request`,
+      data: JSON.stringify({ requestId: request.id, fromUserId: fromUser.id, username: fromUser.username, avatar: fromUser.avatar }),
+    });
+
     res.status(201).json({
       id: request.id,
       fromUser: { id: fromUser.id, username: fromUser.username, avatar: fromUser.avatar ?? null, rating: null },
@@ -185,6 +193,15 @@ router.post("/friends/requests/:id/accept", requireAuth, async (req: AuthRequest
     await db.update(friendRequestsTable).set({ status: "accepted" }).where(eq(friendRequestsTable.id, id));
 
     await db.insert(friendsTable).values({ userId, friendId: request.fromUserId });
+
+    // Send notification to sender that their request was accepted
+    const [acceptingUser] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+    await db.insert(notificationsTable).values({
+      userId: request.fromUserId,
+      type: "friend_request",
+      message: `🎉 ${acceptingUser?.username || 'Someone'} accepted your friend request!`,
+      data: JSON.stringify({ acceptedByUserId: userId, username: acceptingUser?.username, avatar: acceptingUser?.avatar }),
+    });
 
     res.json({ success: true });
   } catch (err) {

@@ -330,6 +330,14 @@ router.post("/notifications/:id/read", requireAuth, async (req: AuthRequest, res
   res.json({ success: true });
 });
 
+// POST /api/notifications/read-all
+router.post("/notifications/read-all", requireAuth, async (req: AuthRequest, res) => {
+  const { notificationsTable } = await import("@workspace/db");
+  await db.update(notificationsTable).set({ isRead: true })
+    .where(eq(notificationsTable.userId, req.userId!));
+  res.json({ success: true });
+});
+
 export function formatGameSummary(game: any) {
   const ratings: Record<string, number> = { bullet1: 0, bullet2: 0, blitz3: 0, blitz5: 0, rapid10: 0, rapid15: 0, rapid30: 0, classical60: 0 };
   return {

@@ -4,7 +4,7 @@ import { z } from "zod/v4";
 import { usersTable } from "./users";
 
 export const friendRequestStatusEnum = ["pending", "accepted", "declined"] as const;
-export const notificationTypeEnum = ["friend_request", "game_invite", "game_result", "system"] as const;
+export const notificationTypeEnum = ["friend_request", "friend_online", "game_invite", "game_result", "system"] as const;
 
 export const friendRequestsTable = sqliteTable("friend_requests", {
   id: integer("id").primaryKey({ autoIncrement: true }),
