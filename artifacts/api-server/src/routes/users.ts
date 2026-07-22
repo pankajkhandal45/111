@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { usersTable, ratingsTable, gamesTable, movesTable, puzzleStreaksTable, puzzlesTable } from "@workspace/db";
-import { eq, and, or, desc, count, sql } from "drizzle-orm";
+import { eq, and, or, desc, count, sql, ne } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../lib/auth";
 import { formatUser } from "./auth";
 
@@ -60,10 +60,17 @@ router.get("/users/:username/stats", async (req, res) => {
       return;
     }
 
-    const games = await db.select().from(gamesTable).where(
+    const games = await db.select({
+      whitePlayerId: gamesTable.whitePlayerId,
+      blackPlayerId: gamesTable.blackPlayerId,
+      result: gamesTable.result,
+      whiteAccuracy: gamesTable.whiteAccuracy,
+      blackAccuracy: gamesTable.blackAccuracy,
+    }).from(gamesTable).where(
       and(
         or(eq(gamesTable.whitePlayerId, user.id), eq(gamesTable.blackPlayerId, user.id)),
-        eq(gamesTable.status, "finished")
+        eq(gamesTable.status, "finished"),
+        ne(gamesTable.mode, "local")
       )
     );
 
@@ -232,11 +239,18 @@ router.get("/dashboard", requireAuth, async (req: AuthRequest, res) => {
       },
     });
 
-    // Stats
-    const games = await db.select().from(gamesTable).where(
+    // Stats (exclude local pass-and-play games from competitive stats)
+    const games = await db.select({
+      whitePlayerId: gamesTable.whitePlayerId,
+      blackPlayerId: gamesTable.blackPlayerId,
+      result: gamesTable.result,
+      whiteAccuracy: gamesTable.whiteAccuracy,
+      blackAccuracy: gamesTable.blackAccuracy,
+    }).from(gamesTable).where(
       and(
         or(eq(gamesTable.whitePlayerId, userId), eq(gamesTable.blackPlayerId, userId)),
-        eq(gamesTable.status, "finished")
+        eq(gamesTable.status, "finished"),
+        ne(gamesTable.mode, "local")
       )
     );
     let wins = 0, losses = 0, draws = 0;

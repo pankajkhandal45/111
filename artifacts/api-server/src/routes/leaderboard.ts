@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { usersTable, ratingsTable, gamesTable } from "@workspace/db";
-import { eq, or, desc, and, like } from "drizzle-orm";
+import { eq, or, desc, and, like, ne } from "drizzle-orm";
 
 const router = Router();
 
@@ -30,10 +30,15 @@ router.get("/leaderboard", async (req, res) => {
 
     // Get wins/losses/draws for each user
     const rawEntries = await Promise.all(users.map(async (u) => {
-      const games = await db.select().from(gamesTable).where(
+      const games = await db.select({
+        whitePlayerId: gamesTable.whitePlayerId,
+        blackPlayerId: gamesTable.blackPlayerId,
+        result: gamesTable.result,
+      }).from(gamesTable).where(
         and(
           or(eq(gamesTable.whitePlayerId, u.id), eq(gamesTable.blackPlayerId, u.id)),
           eq(gamesTable.status, "finished"),
+          ne(gamesTable.mode, "local"),
           like(gamesTable.timeControl, `${timeControl}%`)
         )
       ).limit(100);
