@@ -14,10 +14,16 @@ export default function Home() {
     }
   });
 
-  if (authLoading || dashboardLoading) {
+  if (authLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="space-y-8 animate-pulse">
+        <div className="h-40 bg-muted/40 rounded-xl" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="h-24 bg-muted/40 rounded-xl" />
+          <div className="h-24 bg-muted/40 rounded-xl" />
+          <div className="h-24 bg-muted/40 rounded-xl" />
+          <div className="h-24 bg-muted/40 rounded-xl" />
+        </div>
       </div>
     );
   }

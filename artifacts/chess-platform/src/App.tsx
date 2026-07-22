@@ -10,8 +10,8 @@ import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 import { getBaseUrl } from "@workspace/api-client-react";
+import Home from "@/pages/Home";
 
-const Home = lazy(() => import("@/pages/Home"));
 const Game = lazy(() => import("@/pages/Game"));
 const Login = lazy(() => import("@/pages/Login"));
 const Register = lazy(() => import("@/pages/Register"));

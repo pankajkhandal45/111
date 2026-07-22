@@ -34,7 +34,33 @@
     </noscript>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <style>
+        .app-splash {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+          background-color: #0f172a;
+          color: #f8fafc;
+          font-family: system-ui, -apple-system, sans-serif;
+        }
+        .app-splash-icon {
+          font-size: 3rem;
+          color: #6366f1;
+          animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.6; transform: scale(0.95); }
+        }
+      </style>
+      <div class="app-splash">
+        <div class="app-splash-icon">♔</div>
+        <div style="margin-top: 12px; font-weight: 600; font-size: 1.125rem; letter-spacing: -0.025em;">ChessHub</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
