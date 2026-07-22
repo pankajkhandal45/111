@@ -1,7 +1,7 @@
 import { Router, type Response } from "express";
 import { db } from "@workspace/db";
 import { gamesTable, movesTable, usersTable, ratingsTable } from "@workspace/db";
-import { eq, and, or, desc } from "drizzle-orm";
+import { eq, and, or, desc, ne, gt } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../lib/auth";
 import { formatGameSummary } from "./users";
 import { Chess } from "chess.js";
@@ -119,6 +119,49 @@ router.post("/games", requireAuth, async (req: AuthRequest, res) => {
 
     let whitePlayerId = req.userId!;
     let blackPlayerId: number | null = null;
+
+    // Online matchmaking: check if another ACTIVE & ONLINE player is waiting for an online game
+    if (mode === "online") {
+      const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000);
+      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+
+      const waitingGamesWithHost = await db.select({
+        game: gamesTable,
+        host: usersTable,
+      }).from(gamesTable)
+        .innerJoin(usersTable, eq(gamesTable.whitePlayerId, usersTable.id))
+        .where(
+          and(
+            eq(gamesTable.mode, "online"),
+            eq(gamesTable.status, "waiting"),
+            eq(gamesTable.timeControl, timeControl),
+            ne(gamesTable.whitePlayerId, req.userId!),
+            gt(gamesTable.createdAt, threeMinutesAgo),
+            eq(usersTable.isOnline, true),
+            gt(usersTable.lastSeen, twoMinutesAgo)
+          )
+        );
+
+      if (waitingGamesWithHost.length > 0) {
+        // Pick a random online waiting player
+        const selected = waitingGamesWithHost[Math.floor(Math.random() * waitingGamesWithHost.length)];
+        const targetGame = selected.game;
+
+        // Match current user as Black player and start the game!
+        await db.update(gamesTable).set({
+          blackPlayerId: req.userId!,
+          status: "active",
+          updatedAt: new Date(),
+        }).where(eq(gamesTable.id, targetGame.id));
+
+        const activeGame = await getFullGame(targetGame.id);
+        // Push SSE update to the waiting host (White player) so their screen switches to active board immediately
+        pushGameUpdate(targetGame.id, activeGame);
+
+        res.status(200).json(activeGame);
+        return;
+      }
+    }
 
     // For bot/local games assign both sides, online waits for second player
     if (mode === "bot") {
