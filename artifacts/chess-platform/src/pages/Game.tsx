@@ -608,7 +608,7 @@ export default function Game() {
         // Cancel any in-flight polls so they don't return old state and cause rubber-banding
         queryClient.cancelQueries({ queryKey: getGetGameQueryKey(gameId) });
 
-        // Create an optimistic game object so the whole UI (MoveHistory, lastMove highlights) updates instantly
+        const optimisticMoveNumber = ((game.moves || []).length) + 1;
         const optimisticGame = {
           ...game,
           fen: newFen,
@@ -617,6 +617,7 @@ export default function Game() {
             { 
               id: Date.now(), // fake ID
               gameId: gameId,
+              moveNumber: optimisticMoveNumber,
               playerColor: chess.turn() === 'w' ? 'black' : 'white', // the player who just moved
               from, 
               to, 

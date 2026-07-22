@@ -23,9 +23,10 @@ export function MoveHistory({ moves = [], onMoveClick, activeMoveIndex }: MoveHi
   // moveNumber in DB is 1-based sequential: 1=white's 1st, 2=black's 1st, 3=white's 2nd ...
   const pairedMoves: { pairNumber: number, white?: Move, black?: Move }[] = [];
 
-  moves.forEach(move => {
-    const pairNumber = Math.ceil(move.moveNumber / 2);
-    const isWhiteMove = move.moveNumber % 2 === 1;
+  moves.forEach((move, idx) => {
+    const moveNum = move.moveNumber ?? (idx + 1);
+    const pairNumber = Math.ceil(moveNum / 2);
+    const isWhiteMove = moveNum % 2 === 1;
 
     // Ensure the pair slot exists
     while (pairedMoves.length < pairNumber) {
@@ -34,10 +35,11 @@ export function MoveHistory({ moves = [], onMoveClick, activeMoveIndex }: MoveHi
 
     const pair = pairedMoves[pairNumber - 1];
     if (pair) {
+      const normalizedMove = { ...move, moveNumber: moveNum };
       if (isWhiteMove) {
-        pair.white = move;
+        pair.white = normalizedMove;
       } else {
-        pair.black = move;
+        pair.black = normalizedMove;
       }
     }
   });
