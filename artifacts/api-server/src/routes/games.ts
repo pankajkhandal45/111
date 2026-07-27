@@ -4,6 +4,7 @@ import { gamesTable, movesTable, usersTable, ratingsTable } from "@workspace/db"
 import { eq, and, or, desc, ne, gt } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../lib/auth";
 import { formatGameSummary } from "./users";
+import { updateGameRatings } from "../lib/rating";
 import { Chess } from "chess.js";
 
 const router = Router();
@@ -268,7 +269,7 @@ router.get("/games/active", requireAuth, async (req: AuthRequest, res) => {
 // GET /api/games/:id
 router.get("/games/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const game = await getFullGame(id);
     if (!game) {
       res.status(404).json({ error: "Game not found" });
@@ -283,7 +284,7 @@ router.get("/games/:id", requireAuth, async (req: AuthRequest, res) => {
 
 // GET /api/games/:id/events — SSE stream for real-time game updates
 router.get("/games/:id/events", requireAuth, async (req: AuthRequest, res) => {
-  const gameId = parseInt(req.params.id);
+  const gameId = parseInt(req.params.id as string);
   if (isNaN(gameId)) { res.status(400).end(); return; }
 
   // SSE headers
@@ -315,7 +316,7 @@ router.get("/games/:id/events", requireAuth, async (req: AuthRequest, res) => {
 // POST /api/games/:id/move
 router.post("/games/:id/move", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const { from, to, promotion } = req.body;
 
     const [game] = await db.select().from(gamesTable).where(eq(gamesTable.id, id)).limit(1);
@@ -378,7 +379,7 @@ router.post("/games/:id/move", requireAuth, async (req: AuthRequest, res) => {
     });
 
     // Check for game over
-    let status = game.status;
+    let status: string = game.status;
     let result: "white" | "black" | "draw" | null = null;
     let resultReason: string | null = null;
 
@@ -399,11 +400,27 @@ router.post("/games/:id/move", requireAuth, async (req: AuthRequest, res) => {
     await db.update(gamesTable).set({
       fen: newFen,
       pgn: newPgn,
-      status,
+      status: status as any,
       result: result as any,
       resultReason,
       updatedAt: new Date(),
     }).where(eq(gamesTable.id, id));
+
+    if (status === "finished" && result) {
+      try {
+        await updateGameRatings(
+          id,
+          result,
+          game.whitePlayerId,
+          game.blackPlayerId,
+          game.timeControl,
+          game.mode,
+          game.botLevel
+        );
+      } catch (err) {
+        console.error("Rating update error:", err);
+      }
+    }
 
     const updatedGame = await getFullGame(id);
     // Push real-time update to all SSE subscribers of this game
@@ -437,17 +454,33 @@ router.post("/games/:id/move", requireAuth, async (req: AuthRequest, res) => {
 // POST /api/games/:id/resign
 router.post("/games/:id/resign", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const [game] = await db.select().from(gamesTable).where(eq(gamesTable.id, id)).limit(1);
     if (!game) { res.status(404).json({ error: "Not found" }); return; }
 
     const isWhite = game.whitePlayerId === req.userId;
+    const result: "white" | "black" = isWhite ? "black" : "white";
+
     await db.update(gamesTable).set({
       status: "finished",
-      result: isWhite ? "black" : "white",
+      result,
       resultReason: "resignation",
       updatedAt: new Date(),
     }).where(eq(gamesTable.id, id));
+
+    try {
+      await updateGameRatings(
+        id,
+        result,
+        game.whitePlayerId,
+        game.blackPlayerId,
+        game.timeControl,
+        game.mode,
+        game.botLevel
+      );
+    } catch (err) {
+      console.error("Rating update error:", err);
+    }
 
     const updatedGame = await getFullGame(id);
     pushGameUpdate(id, updatedGame);
@@ -461,13 +494,30 @@ router.post("/games/:id/resign", requireAuth, async (req: AuthRequest, res) => {
 // POST /api/games/:id/draw
 router.post("/games/:id/draw", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
+    const [game] = await db.select().from(gamesTable).where(eq(gamesTable.id, id)).limit(1);
+    if (!game) { res.status(404).json({ error: "Not found" }); return; }
+
     await db.update(gamesTable).set({
       status: "finished",
       result: "draw",
       resultReason: "agreement",
       updatedAt: new Date(),
     }).where(eq(gamesTable.id, id));
+
+    try {
+      await updateGameRatings(
+        id,
+        "draw",
+        game.whitePlayerId,
+        game.blackPlayerId,
+        game.timeControl,
+        game.mode,
+        game.botLevel
+      );
+    } catch (err) {
+      console.error("Rating update error:", err);
+    }
 
     const updatedGame = await getFullGame(id);
     pushGameUpdate(id, updatedGame);
@@ -478,9 +528,50 @@ router.post("/games/:id/draw", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
+// POST /api/games/:id/timeout
+router.post("/games/:id/timeout", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id as string);
+    const { playerColor } = req.body;
+    const [game] = await db.select().from(gamesTable).where(eq(gamesTable.id, id)).limit(1);
+    if (!game) { res.status(404).json({ error: "Not found" }); return; }
+    if (game.status !== "active") { res.json(await getFullGame(id)); return; }
+
+    const result: "white" | "black" = playerColor === "white" ? "black" : "white";
+
+    await db.update(gamesTable).set({
+      status: "finished",
+      result,
+      resultReason: "timeout",
+      updatedAt: new Date(),
+    }).where(eq(gamesTable.id, id));
+
+    try {
+      await updateGameRatings(
+        id,
+        result,
+        game.whitePlayerId,
+        game.blackPlayerId,
+        game.timeControl,
+        game.mode,
+        game.botLevel
+      );
+    } catch (err) {
+      console.error("Rating update error:", err);
+    }
+
+    const updatedGame = await getFullGame(id);
+    pushGameUpdate(id, updatedGame);
+    res.json(updatedGame);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Failed to process timeout" });
+  }
+});
+
 // GET /api/games/:id/chat/events — SSE stream for real-time chat
 router.get("/games/:id/chat/events", requireAuth, async (req: AuthRequest, res) => {
-  const gameId = parseInt(req.params.id);
+  const gameId = parseInt(req.params.id as string);
   if (isNaN(gameId)) { res.status(400).end(); return; }
 
   res.setHeader("Content-Type", "text/event-stream");
@@ -504,7 +595,7 @@ router.get("/games/:id/chat/events", requireAuth, async (req: AuthRequest, res) 
 // POST /api/games/:id/chat — Send a chat message
 router.post("/games/:id/chat", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const gameId = parseInt(req.params.id);
+    const gameId = parseInt(req.params.id as string);
     if (isNaN(gameId)) { res.status(400).json({ error: "Invalid game id" }); return; }
 
     const { text } = req.body;
@@ -538,7 +629,7 @@ router.post("/games/:id/chat", requireAuth, async (req: AuthRequest, res) => {
 // GET /api/games/:id/analysis
 router.get("/games/:id/analysis", async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const game = await getFullGame(id);
     if (!game) { res.status(404).json({ error: "Not found" }); return; }
 
@@ -600,6 +691,10 @@ async function getFullGame(id: number) {
     whiteTimeMs: game.whiteTimeMs ?? null,
     blackTimeMs: game.blackTimeMs ?? null,
     roomCode: game.roomCode ?? null,
+    opening: game.opening ?? null,
+    openingEco: game.openingEco ?? null,
+    whiteAccuracy: game.whiteAccuracy ?? null,
+    blackAccuracy: game.blackAccuracy ?? null,
     createdAt: game.createdAt,
     updatedAt: game.updatedAt,
     // ✅ Player info for display (names + avatars)
@@ -762,6 +857,25 @@ async function computeBotMove(gameId: number, pgn: string, fen: string, level: s
       resultReason,
       updatedAt: new Date(),
     }).where(eq(gamesTable.id, gameId));
+
+    if (status === "finished" && result) {
+      try {
+        const [game] = await db.select().from(gamesTable).where(eq(gamesTable.id, gameId)).limit(1);
+        if (game) {
+          await updateGameRatings(
+            gameId,
+            result,
+            game.whitePlayerId,
+            game.blackPlayerId,
+            game.timeControl,
+            game.mode,
+            game.botLevel
+          );
+        }
+      } catch (err) {
+        console.error("Bot game rating update error:", err);
+      }
+    }
   } catch (err) {
     console.error("Bot move error:", err);
   }

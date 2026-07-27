@@ -2,7 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcrypt";
 import { db } from "@workspace/db";
 import { usersTable, ratingsTable } from "@workspace/db";
-import { eq, and, lt } from "drizzle-orm";
+import { eq, and, lt, or, gt } from "drizzle-orm";
 import { signToken, requireAuth, type AuthRequest } from "../lib/auth";
 
 const router = Router();

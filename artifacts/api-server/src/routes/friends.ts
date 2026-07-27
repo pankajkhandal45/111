@@ -91,7 +91,7 @@ router.get("/friends/requests/sent", requireAuth, async (req: AuthRequest, res) 
 // POST /api/friends/requests/:id/cancel
 router.post("/friends/requests/:id/cancel", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const userId = req.userId!;
     
     // Only the sender can cancel it
@@ -183,7 +183,7 @@ router.post("/friends/requests", requireAuth, async (req: AuthRequest, res) => {
 // POST /api/friends/requests/:id/accept
 router.post("/friends/requests/:id/accept", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const userId = req.userId!;
 
     const [request] = await db.select().from(friendRequestsTable)
@@ -213,7 +213,7 @@ router.post("/friends/requests/:id/accept", requireAuth, async (req: AuthRequest
 // POST /api/friends/requests/:id/decline
 router.post("/friends/requests/:id/decline", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     await db.update(friendRequestsTable).set({ status: "declined" }).where(eq(friendRequestsTable.id, id));
     res.json({ success: true });
   } catch (err) {

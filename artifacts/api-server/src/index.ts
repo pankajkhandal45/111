@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { recalculateAllRatings } from "./lib/rating";
 
 const rawPort = process.env.PORT || "8080";
 
@@ -16,4 +17,11 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  // Recalculate ratings for existing finished games
+  recalculateAllRatings().then(() => {
+    logger.info("Ratings synced successfully");
+  }).catch((e) => {
+    logger.error({ e }, "Error syncing ratings");
+  });
 });

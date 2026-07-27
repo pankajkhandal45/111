@@ -108,7 +108,7 @@ router.get("/admin/users", requireAdmin, async (req: AuthRequest, res) => {
 // PATCH /api/admin/users/:id/role
 router.patch("/admin/users/:id/role", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const { role } = req.body;
     if (!["user", "admin"].includes(role)) {
       res.status(400).json({ error: "Invalid role" });
@@ -133,7 +133,7 @@ router.patch("/admin/users/:id/role", requireAdmin, async (req: AuthRequest, res
 // DELETE /api/admin/users/:id
 router.delete("/admin/users/:id", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     if (id === req.userId) {
       res.status(400).json({ error: "Cannot delete yourself" });
       return;

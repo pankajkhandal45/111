@@ -1,5 +1,6 @@
 import { db } from "./index";
 import { usersTable, ratingsTable } from "./schema";
+// @ts-ignore
 import bcrypt from "bcrypt";
 
 async function seed() {

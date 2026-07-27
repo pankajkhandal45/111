@@ -324,7 +324,7 @@ router.get("/notifications", requireAuth, async (req: AuthRequest, res) => {
 // POST /api/notifications/:id/read
 router.post("/notifications/:id/read", requireAuth, async (req: AuthRequest, res) => {
   const { notificationsTable } = await import("@workspace/db");
-  const id = parseInt(req.params.id);
+  const id = parseInt(req.params.id as string);
   await db.update(notificationsTable).set({ isRead: true })
     .where(and(eq(notificationsTable.id, id), eq(notificationsTable.userId, req.userId!)));
   res.json({ success: true });

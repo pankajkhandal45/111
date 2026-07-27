@@ -64,7 +64,7 @@ router.get("/puzzles", async (req, res) => {
 // POST /api/puzzles/:id/solve
 router.post("/puzzles/:id/solve", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const { solved, timeTakenMs } = req.body;
     const userId = req.userId!;
 
