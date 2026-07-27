@@ -3,7 +3,6 @@ import { useGetDashboard } from '@workspace/api-client-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Link } from 'wouter';
 import { 
@@ -19,22 +18,90 @@ import {
   TrendingUp, 
   Swords, 
   Sparkles, 
-  CheckCircle2, 
-  XCircle, 
-  HelpCircle,
   Activity,
   Bot,
-  UserPlus
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 function getRankTier(rating: number) {
-  if (rating >= 1800) return { name: 'Master', badge: '👑', color: 'from-rose-500 to-red-600', text: 'text-rose-400' };
-  if (rating >= 1600) return { name: 'Diamond', badge: '💠', color: 'from-purple-500 to-indigo-600', text: 'text-purple-400' };
-  if (rating >= 1400) return { name: 'Platinum', badge: '💎', color: 'from-cyan-500 to-blue-600', text: 'text-cyan-400' };
-  if (rating >= 1200) return { name: 'Gold', badge: '🥇', color: 'from-amber-400 to-yellow-500', text: 'text-amber-400' };
-  if (rating >= 1000) return { name: 'Silver', badge: '🥈', color: 'from-slate-300 to-slate-400', text: 'text-slate-300' };
-  return { name: 'Bronze', badge: '🥉', color: 'from-amber-700 to-amber-900', text: 'text-amber-600' };
+  if (rating >= 1800) return { name: 'Master', badge: '👑', color: '#f43f5e', text: 'text-rose-400' };
+  if (rating >= 1600) return { name: 'Diamond', badge: '💠', color: '#8b5cf6', text: 'text-purple-400' };
+  if (rating >= 1400) return { name: 'Platinum', badge: '💎', color: '#06b6d4', text: 'text-cyan-400' };
+  if (rating >= 1200) return { name: 'Gold', badge: '🥇', color: '#f59e0b', text: 'text-amber-400' };
+  if (rating >= 1000) return { name: 'Silver', badge: '🥈', color: '#94a3b8', text: 'text-slate-300' };
+  return { name: 'Bronze', badge: '🥉', color: '#b45309', text: 'text-amber-600' };
+}
+
+// Circular progress ring component
+function RatingCircle({
+  rating,
+  icon,
+  label,
+  badge,
+  color,
+  accentText,
+  subLabel,
+}: {
+  rating: number;
+  icon: React.ReactNode;
+  label: string;
+  badge: string;
+  color: string;
+  accentText: string;
+  subLabel: string;
+}) {
+  const tier = getRankTier(rating);
+  // Map rating 600–2000 to 0–100%
+  const MIN = 600;
+  const MAX = 2000;
+  const pct = Math.min(100, Math.max(0, ((rating - MIN) / (MAX - MIN)) * 100));
+
+  const radius = 38;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (pct / 100) * circumference;
+
+  return (
+    <Card className="relative overflow-hidden border-border/60 hover:border-primary/40 transition-all duration-300 shadow-sm hover:shadow-md group">
+      <CardContent className="flex flex-col items-center justify-center gap-2 pt-5 pb-4 px-3">
+        {/* SVG Circle */}
+        <div className="relative w-24 h-24">
+          <svg className="w-full h-full -rotate-90" viewBox="0 0 96 96">
+            {/* Background track */}
+            <circle
+              cx="48" cy="48" r={radius}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="7"
+              className="text-muted/40"
+            />
+            {/* Progress arc */}
+            <circle
+              cx="48" cy="48" r={radius}
+              fill="none"
+              stroke={tier.color}
+              strokeWidth="7"
+              strokeLinecap="round"
+              strokeDasharray={circumference}
+              strokeDashoffset={strokeDashoffset}
+              style={{ transition: 'stroke-dashoffset 0.8s ease' }}
+            />
+          </svg>
+          {/* Center icon + rating */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5">
+            <div className="opacity-80">{icon}</div>
+            <span className="text-lg font-extrabold leading-none tracking-tight">{rating}</span>
+          </div>
+        </div>
+
+        {/* Label */}
+        <div className="text-center space-y-0.5">
+          <div className="font-bold text-sm">{label}</div>
+          <div className="text-[11px] text-muted-foreground">{badge} {tier.name}</div>
+          <div className="text-[10px] text-muted-foreground/60">{subLabel}</div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function Home() {
@@ -50,9 +117,9 @@ export default function Home() {
     return (
       <div className="space-y-6 animate-pulse p-2">
         <div className="h-44 bg-muted/40 rounded-2xl" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-32 bg-muted/40 rounded-xl" />
+            <div key={i} className="h-40 bg-muted/40 rounded-xl" />
           ))}
         </div>
       </div>
@@ -71,7 +138,7 @@ export default function Home() {
         </div>
 
         <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tight bg-gradient-to-r from-foreground via-foreground/90 to-foreground/70 bg-clip-text text-transparent max-w-4xl mx-auto leading-tight">
-          Master the Game of Kings with Modern Speed & Style.
+          Master the Game of Kings with Modern Speed &amp; Style.
         </h1>
 
         <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
@@ -128,7 +195,6 @@ export default function Home() {
   const draws = stats.draws;
 
   const recentGames = dashboard?.recentGames || [];
-  const dailyPuzzle = dashboard?.dailyPuzzle;
 
   return (
     <div className="space-y-8 pb-12">
@@ -182,182 +248,108 @@ export default function Home() {
           <span className="text-xs text-muted-foreground">Live Elo stats</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Rapid Card */}
-          <Card className="relative overflow-hidden border-border/60 hover:border-primary/50 transition-colors shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Clock className="w-4 h-4 text-emerald-400" /> Rapid
-              </CardTitle>
-              <Badge variant="secondary" className="text-xs font-bold">10 min</Badge>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-extrabold tracking-tight">{ratings.rapid}</div>
-              <div className="flex items-center justify-between text-xs text-muted-foreground mt-2">
-                <span>{getRankTier(ratings.rapid).badge} {getRankTier(ratings.rapid).name}</span>
-                <span className="text-emerald-400 font-semibold flex items-center gap-0.5">
-                  <TrendingUp className="w-3 h-3" /> Rated
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Blitz Card */}
-          <Card className="relative overflow-hidden border-border/60 hover:border-primary/50 transition-colors shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Zap className="w-4 h-4 text-amber-400" /> Blitz
-              </CardTitle>
-              <Badge variant="secondary" className="text-xs font-bold">3 min</Badge>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-extrabold tracking-tight">{ratings.blitz}</div>
-              <div className="flex items-center justify-between text-xs text-muted-foreground mt-2">
-                <span>{getRankTier(ratings.blitz).badge} {getRankTier(ratings.blitz).name}</span>
-                <span className="text-amber-400 font-semibold flex items-center gap-0.5">
-                  <TrendingUp className="w-3 h-3" /> Rated
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Bullet Card */}
-          <Card className="relative overflow-hidden border-border/60 hover:border-primary/50 transition-colors shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Flame className="w-4 h-4 text-rose-400" /> Bullet
-              </CardTitle>
-              <Badge variant="secondary" className="text-xs font-bold">1 min</Badge>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-extrabold tracking-tight">{ratings.bullet}</div>
-              <div className="flex items-center justify-between text-xs text-muted-foreground mt-2">
-                <span>{getRankTier(ratings.bullet).badge} {getRankTier(ratings.bullet).name}</span>
-                <span className="text-rose-400 font-semibold flex items-center gap-0.5">
-                  <TrendingUp className="w-3 h-3" /> Rated
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Puzzle Card */}
-          <Card className="relative overflow-hidden border-border/60 hover:border-primary/50 transition-colors shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Puzzle className="w-4 h-4 text-purple-400" /> Puzzles
-              </CardTitle>
-              <Badge variant="secondary" className="text-xs font-bold">Tactics</Badge>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-extrabold tracking-tight">{ratings.puzzleRating}</div>
-              <div className="flex items-center justify-between text-xs text-muted-foreground mt-2">
-                <span>🔥 Streak: {stats.currentStreak}</span>
-                <span className="text-purple-400 font-semibold flex items-center gap-0.5">
-                  <Sparkles className="w-3 h-3" /> Daily
-                </span>
-              </div>
-            </CardContent>
-          </Card>
+        {/* 2 columns on mobile, 4 on desktop */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+          <RatingCircle
+            rating={ratings.rapid}
+            icon={<Clock className="w-4 h-4 text-emerald-400" />}
+            label="Rapid"
+            badge={getRankTier(ratings.rapid).badge}
+            color={getRankTier(ratings.rapid).color}
+            accentText="text-emerald-400"
+            subLabel="10 min"
+          />
+          <RatingCircle
+            rating={ratings.blitz}
+            icon={<Zap className="w-4 h-4 text-amber-400" />}
+            label="Blitz"
+            badge={getRankTier(ratings.blitz).badge}
+            color={getRankTier(ratings.blitz).color}
+            accentText="text-amber-400"
+            subLabel="3 min"
+          />
+          <RatingCircle
+            rating={ratings.bullet}
+            icon={<Flame className="w-4 h-4 text-rose-400" />}
+            label="Bullet"
+            badge={getRankTier(ratings.bullet).badge}
+            color={getRankTier(ratings.bullet).color}
+            accentText="text-rose-400"
+            subLabel="1 min"
+          />
+          <RatingCircle
+            rating={ratings.puzzleRating}
+            icon={<Puzzle className="w-4 h-4 text-purple-400" />}
+            label="Puzzles"
+            badge={getRankTier(ratings.puzzleRating).badge}
+            color={getRankTier(ratings.puzzleRating).color}
+            accentText="text-purple-400"
+            subLabel={`🔥 Streak: ${stats.currentStreak}`}
+          />
         </div>
       </div>
 
-      {/* ── Main Dashboard Split: Win Rate & Daily Puzzle ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Win Rate Card (2 cols) */}
-        <Card className="lg:col-span-2 border-border/60 shadow-sm flex flex-col justify-between">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg font-bold flex items-center gap-2">
-                <Target className="w-5 h-5 text-primary" /> Competitive Win Rate & Stats
-              </CardTitle>
-              <Badge variant="outline" className="font-mono text-xs font-bold">
-                {totalGames} Games Played
-              </Badge>
-            </div>
-            <CardDescription>
-              Performance breakdown over all competitive matches
-            </CardDescription>
-          </CardHeader>
+      {/* ── Win Rate Card ── */}
+      <Card className="border-border/60 shadow-sm">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg font-bold flex items-center gap-2">
+              <Target className="w-5 h-5 text-primary" /> Competitive Win Rate &amp; Stats
+            </CardTitle>
+            <Badge variant="outline" className="font-mono text-xs font-bold">
+              {totalGames} Games Played
+            </Badge>
+          </div>
+          <CardDescription>
+            Performance breakdown over all competitive matches
+          </CardDescription>
+        </CardHeader>
 
-          <CardContent className="space-y-6">
-            {/* Win Rate Progress & Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center bg-muted/30 p-4 rounded-xl border border-border/40">
-              <div className="text-center sm:text-left space-y-1">
-                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Win Rate</div>
-                <div className="text-4xl font-black text-primary">{winPercent.toFixed(1)}%</div>
-              </div>
-
-              <div className="sm:col-span-2 space-y-2">
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span className="text-emerald-500">{wins} Wins ({totalGames > 0 ? Math.round((wins/totalGames)*100) : 0}%)</span>
-                  <span className="text-slate-400">{draws} Draws</span>
-                  <span className="text-rose-500">{losses} Losses ({totalGames > 0 ? Math.round((losses/totalGames)*100) : 0}%)</span>
-                </div>
-                {/* Visual Progress Bar */}
-                <div className="h-3 w-full bg-rose-500/20 rounded-full overflow-hidden flex">
-                  <div 
-                    className="bg-emerald-500 transition-all duration-500" 
-                    style={{ width: `${totalGames > 0 ? (wins/totalGames)*100 : 0}%` }} 
-                  />
-                  <div 
-                    className="bg-slate-400 transition-all duration-500" 
-                    style={{ width: `${totalGames > 0 ? (draws/totalGames)*100 : 0}%` }} 
-                  />
-                </div>
-              </div>
+        <CardContent className="space-y-6">
+          {/* Win Rate Progress & Stats */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center bg-muted/30 p-4 rounded-xl border border-border/40">
+            <div className="text-center sm:text-left space-y-1">
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Win Rate</div>
+              <div className="text-4xl font-black text-primary">{winPercent.toFixed(1)}%</div>
             </div>
 
-            {/* Score Pill Badges */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="p-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-center">
-                <div className="text-xs text-emerald-500 font-semibold">Victory</div>
-                <div className="text-xl font-bold text-emerald-500">{wins}</div>
+            <div className="sm:col-span-2 space-y-2">
+              <div className="flex items-center justify-between text-xs font-bold">
+                <span className="text-emerald-500">{wins} Wins ({totalGames > 0 ? Math.round((wins/totalGames)*100) : 0}%)</span>
+                <span className="text-slate-400">{draws} Draws</span>
+                <span className="text-rose-500">{losses} Losses ({totalGames > 0 ? Math.round((losses/totalGames)*100) : 0}%)</span>
               </div>
-              <div className="p-3 rounded-xl border border-slate-500/20 bg-slate-500/5 text-center">
-                <div className="text-xs text-slate-400 font-semibold">Draw</div>
-                <div className="text-xl font-bold text-slate-300">{draws}</div>
-              </div>
-              <div className="p-3 rounded-xl border border-rose-500/20 bg-rose-500/5 text-center">
-                <div className="text-xs text-rose-500 font-semibold">Defeat</div>
-                <div className="text-xl font-bold text-rose-500">{losses}</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Daily Puzzle Card (1 col) */}
-        <Card className="border-border/60 shadow-sm flex flex-col justify-between bg-gradient-to-b from-purple-500/10 via-card to-card">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg font-bold flex items-center gap-2">
-                <Puzzle className="w-5 h-5 text-purple-400" /> Daily Puzzle
-              </CardTitle>
-              <Badge variant="secondary" className="bg-purple-500/20 text-purple-300 font-bold">
-                +{dailyPuzzle?.rating || 1200} Elo
-              </Badge>
-            </div>
-            <CardDescription>
-              Train your tactical vision every day
-            </CardDescription>
-          </CardHeader>
-
-          <CardContent className="space-y-4">
-            <div className="p-4 rounded-xl border border-purple-500/20 bg-purple-500/5 space-y-2">
-              <h3 className="font-bold text-base line-clamp-1">{dailyPuzzle?.title || "Daily Tactics Challenge"}</h3>
-              <p className="text-xs text-muted-foreground">Find the best sequence of moves to win material or mate.</p>
-              <div className="flex items-center gap-2 text-xs font-semibold text-purple-400 pt-1">
-                <Sparkles className="w-4 h-4" /> Current Streak: {stats.currentStreak} Days
+              {/* Visual Progress Bar */}
+              <div className="h-3 w-full bg-rose-500/20 rounded-full overflow-hidden flex">
+                <div 
+                  className="bg-emerald-500 transition-all duration-500" 
+                  style={{ width: `${totalGames > 0 ? (wins/totalGames)*100 : 0}%` }} 
+                />
+                <div 
+                  className="bg-slate-400 transition-all duration-500" 
+                  style={{ width: `${totalGames > 0 ? (draws/totalGames)*100 : 0}%` }} 
+                />
               </div>
             </div>
+          </div>
 
-            <Button asChild size="lg" className="w-full font-bold bg-purple-600 hover:bg-purple-700 text-white rounded-xl shadow-md">
-              <Link href="/puzzles">
-                Solve Daily Puzzle <ArrowRight className="w-4 h-4 ml-2" />
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+          {/* Score Pill Badges */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="p-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-center">
+              <div className="text-xs text-emerald-500 font-semibold">Victory</div>
+              <div className="text-xl font-bold text-emerald-500">{wins}</div>
+            </div>
+            <div className="p-3 rounded-xl border border-slate-500/20 bg-slate-500/5 text-center">
+              <div className="text-xs text-slate-400 font-semibold">Draw</div>
+              <div className="text-xl font-bold text-slate-300">{draws}</div>
+            </div>
+            <div className="p-3 rounded-xl border border-rose-500/20 bg-rose-500/5 text-center">
+              <div className="text-xs text-rose-500 font-semibold">Defeat</div>
+              <div className="text-xl font-bold text-rose-500">{losses}</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* ── Recent Games List ── */}
       <div className="space-y-3">
