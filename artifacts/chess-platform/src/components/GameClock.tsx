@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 interface GameClockProps {
@@ -9,21 +9,33 @@ interface GameClockProps {
 
 export function GameClock({ timeMs, isActive, color }: GameClockProps) {
   const [timeLeft, setTimeLeft] = useState<number | null>(timeMs);
+  const prevActiveRef = useRef<boolean>(false);
 
-  // Sync starting time when turn changes or server provides updated game
+  // Sync starting time when turn transitions from inactive to active, or on initial load
   useEffect(() => {
-    setTimeLeft(timeMs);
+    if (timeMs === null) {
+      setTimeLeft(null);
+      return;
+    }
+
+    // Sync if turn just became active, OR if clock was uninitialized (null)
+    if ((isActive && !prevActiveRef.current) || timeLeft === null) {
+      setTimeLeft(timeMs);
+    }
+    
+    prevActiveRef.current = isActive;
   }, [isActive, timeMs]);
 
+  // Tick down every 100ms while turn is active
   useEffect(() => {
     if (!isActive || timeMs === null) return;
 
     const interval = setInterval(() => {
-      setTimeLeft((prev) => (prev != null ? Math.max(0, prev - 100) : null)); // Update every 100ms
+      setTimeLeft((prev) => (prev != null ? Math.max(0, prev - 100) : null));
     }, 100);
 
     return () => clearInterval(interval);
-  }, [isActive]);
+  }, [isActive, timeMs]);
 
   if (timeMs === null || timeLeft === null) {
     return (
