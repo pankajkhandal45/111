@@ -355,6 +355,22 @@ router.post("/games/:id/move", requireAuth, async (req: AuthRequest, res) => {
       }
     }
 
+    // Calculate elapsed time for the player who just moved
+    const now = new Date();
+    const elapsedMs = game.updatedAt ? Math.max(0, now.getTime() - new Date(game.updatedAt).getTime()) : 0;
+
+    let whiteTimeMs = game.whiteTimeMs;
+    let blackTimeMs = game.blackTimeMs;
+    const movingTurn = chess.turn(); // Turn BEFORE applying move ('w' or 'b')
+
+    if (whiteTimeMs != null && blackTimeMs != null) {
+      if (movingTurn === 'w') {
+        whiteTimeMs = Math.max(0, whiteTimeMs - elapsedMs);
+      } else {
+        blackTimeMs = Math.max(0, blackTimeMs - elapsedMs);
+      }
+    }
+
     let moveResult;
     try {
       moveResult = chess.move({ from, to, promotion: promotion || undefined });
@@ -383,7 +399,11 @@ router.post("/games/:id/move", requireAuth, async (req: AuthRequest, res) => {
     let result: "white" | "black" | "draw" | null = null;
     let resultReason: string | null = null;
 
-    if (chess.isCheckmate()) {
+    if (whiteTimeMs === 0 || blackTimeMs === 0) {
+      status = "finished";
+      result = whiteTimeMs === 0 ? "black" : "white";
+      resultReason = "timeout";
+    } else if (chess.isCheckmate()) {
       status = "finished";
       result = chess.turn() === "w" ? "black" : "white";
       resultReason = "checkmate";
@@ -400,10 +420,12 @@ router.post("/games/:id/move", requireAuth, async (req: AuthRequest, res) => {
     await db.update(gamesTable).set({
       fen: newFen,
       pgn: newPgn,
+      whiteTimeMs,
+      blackTimeMs,
       status: status as any,
       result: result as any,
       resultReason,
-      updatedAt: new Date(),
+      updatedAt: now,
     }).where(eq(gamesTable.id, id));
 
     if (status === "finished" && result) {
@@ -677,19 +699,60 @@ async function getFullGame(id: number) {
 
   if (!game) return null;
 
+  let whiteTimeMs = game.whiteTimeMs ?? null;
+  let blackTimeMs = game.blackTimeMs ?? null;
+  let status = game.status;
+  let result = game.result ?? null;
+  let resultReason = game.resultReason ?? null;
+
+  // If game is active and timed, calculate live ticking remaining time
+  if (status === "active" && whiteTimeMs !== null && blackTimeMs !== null && game.updatedAt) {
+    const elapsedMs = Math.max(0, Date.now() - new Date(game.updatedAt).getTime());
+    const chess = new Chess();
+    if (game.pgn) {
+      try { chess.loadPgn(game.pgn); } catch { chess.load(game.fen); }
+    } else {
+      chess.load(game.fen);
+    }
+
+    const currentTurn = chess.turn(); // 'w' or 'b'
+    if (currentTurn === 'w') {
+      whiteTimeMs = Math.max(0, whiteTimeMs - elapsedMs);
+    } else {
+      blackTimeMs = Math.max(0, blackTimeMs - elapsedMs);
+    }
+
+    // Check if time expired
+    if (whiteTimeMs === 0 || blackTimeMs === 0) {
+      status = "finished";
+      result = whiteTimeMs === 0 ? "black" : "white";
+      resultReason = "timeout";
+
+      // Persist timeout to database asynchronously
+      db.update(gamesTable).set({
+        status: "finished",
+        result,
+        resultReason: "timeout",
+        whiteTimeMs,
+        blackTimeMs,
+        updatedAt: new Date(),
+      }).where(eq(gamesTable.id, id)).catch(() => {});
+    }
+  }
+
   return {
     id: game.id,
     fen: game.fen,
     pgn: game.pgn,
-    status: game.status,
-    result: game.result ?? null,
-    resultReason: game.resultReason ?? null,
+    status,
+    result,
+    resultReason,
     timeControl: game.timeControl,
     mode: game.mode,
     whitePlayerId: game.whitePlayerId,
     blackPlayerId: game.blackPlayerId ?? null,
-    whiteTimeMs: game.whiteTimeMs ?? null,
-    blackTimeMs: game.blackTimeMs ?? null,
+    whiteTimeMs,
+    blackTimeMs,
     roomCode: game.roomCode ?? null,
     opening: game.opening ?? null,
     openingEco: game.openingEco ?? null,
@@ -723,104 +786,167 @@ async function computeBotMove(gameId: number, pgn: string, fen: string, level: s
   try {
     const chess = new Chess();
     if (pgn) {
-      chess.loadPgn(pgn);
+      try { chess.loadPgn(pgn); } catch { chess.load(fen); }
     } else {
       chess.load(fen);
     }
-    
+
     if (chess.isGameOver()) return;
 
     const legalMoves = chess.moves({ verbose: true });
     if (legalMoves.length === 0) return;
 
-    let selectedMove;
-    const levelMap: Record<string, number> = {
-      beginner: 0, easy: 1, intermediate: 1, advanced: 2, expert: 2, master: 3, grandmaster: 3
-    };
-    const depth = levelMap[level] || 1;
+    let selectedMove: any;
 
-    if (depth === 0) {
+    if (level === 'beginner') {
       selectedMove = legalMoves[Math.floor(Math.random() * legalMoves.length)];
+    } else if (level === 'easy') {
+      const captures = legalMoves.filter((m: any) => m.flags.includes('c'));
+      selectedMove = captures.length > 0 && Math.random() < 0.6
+        ? captures[Math.floor(Math.random() * captures.length)]
+        : legalMoves[Math.floor(Math.random() * legalMoves.length)];
     } else {
-      const isMaximizing = chess.turn() === 'w';
-      
-      const evaluateBoard = (c: any) => {
+      const depth = level === 'intermediate' ? 1
+        : level === 'advanced' ? 2
+        : level === 'expert' ? 3
+        : level === 'master' ? 3
+        : 4;
+
+      const PAWN_PST = [
+        [0,  0,  0,  0,  0,  0,  0,  0],
+        [50, 50, 50, 50, 50, 50, 50, 50],
+        [10, 10, 20, 30, 30, 20, 10, 10],
+        [ 5,  5, 10, 25, 25, 10,  5,  5],
+        [ 0,  0,  0, 20, 20,  0,  0,  0],
+        [ 5, -5,-10,  0,  0,-10, -5,  5],
+        [ 5, 10, 10,-20,-20, 10, 10,  5],
+        [ 0,  0,  0,  0,  0,  0,  0,  0]
+      ];
+      const KNIGHT_PST = [
+        [-50,-40,-30,-30,-30,-30,-40,-50],
+        [-40,-20,  0,  0,  0,  0,-20,-40],
+        [-30,  0, 10, 15, 15, 10,  0,-30],
+        [-30,  5, 15, 20, 20, 15,  5,-30],
+        [-30,  0, 15, 20, 20, 15,  0,-30],
+        [-30,  5, 10, 15, 15, 10,  5,-30],
+        [-40,-20,  0,  5,  5,  0,-20,-40],
+        [-50,-40,-30,-30,-30,-30,-40,-50]
+      ];
+      const BISHOP_PST = [
+        [-20,-10,-10,-10,-10,-10,-10,-20],
+        [-10,  0,  0,  0,  0,  0,  0,-10],
+        [-10,  0,  5, 10, 10,  5,  0,-10],
+        [-10,  5,  5, 10, 10,  5,  5,-10],
+        [-10,  0, 10, 10, 10, 10,  0,-10],
+        [-10, 10, 10, 10, 10, 10, 10,-10],
+        [-10,  5,  0,  0,  0,  0,  5,-10],
+        [-20,-10,-10,-10,-10,-10,-10,-20]
+      ];
+      const ROOK_PST = [
+        [ 0,  0,  0,  0,  0,  0,  0,  0],
+        [ 5, 10, 10, 10, 10, 10, 10,  5],
+        [-5,  0,  0,  0,  0,  0,  0, -5],
+        [-5,  0,  0,  0,  0,  0,  0, -5],
+        [-5,  0,  0,  0,  0,  0,  0, -5],
+        [-5,  0,  0,  0,  0,  0,  0, -5],
+        [-5,  0,  0,  0,  0,  0,  0, -5],
+        [ 0,  0,  0,  5,  5,  0,  0,  0]
+      ];
+      const QUEEN_PST = [
+        [-20,-10,-10, -5, -5,-10,-10,-20],
+        [-10,  0,  0,  0,  0,  0,  0,-10],
+        [-10,  0,  5,  5,  5,  5,  0,-10],
+        [ -5,  0,  5,  5,  5,  5,  0, -5],
+        [  0,  0,  5,  5,  5,  5,  0,  0],
+        [-10,  5,  5,  5,  5,  5,  0,-10],
+        [-10,  0,  5,  0,  0,  0,  0,-10],
+        [-20,-10,-10, -5, -5,-10,-10,-20]
+      ];
+      const KING_PST = [
+        [-30,-40,-40,-50,-50,-40,-40,-30],
+        [-30,-40,-40,-50,-50,-40,-40,-30],
+        [-30,-40,-40,-50,-50,-40,-40,-30],
+        [-30,-40,-40,-50,-50,-40,-40,-30],
+        [-20,-30,-30,-40,-40,-30,-30,-20],
+        [-10,-20,-20,-20,-20,-20,-20,-10],
+        [ 20, 20,  0,  0,  0,  0, 20, 20],
+        [ 20, 30, 10,  0,  0, 10, 30, 20]
+      ];
+
+      const evaluateBoard = (c: Chess): number => {
+        const PIECE_VALS: Record<string, number> = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 };
         let score = 0;
-        const values: Record<string, number> = { p: 10, n: 30, b: 30, r: 50, q: 90, k: 900 };
         const board = c.board();
+
         for (let r = 0; r < 8; r++) {
           for (let f = 0; f < 8; f++) {
             const piece = board[r][f];
-            if (piece) {
-              const val = values[piece.type] || 0;
-              score += piece.color === 'w' ? val : -val;
-            }
+            if (!piece) continue;
+
+            const baseVal = PIECE_VALS[piece.type] || 0;
+            let pstVal = 0;
+            const pstRow = piece.color === 'w' ? 7 - r : r;
+            const pstCol = f;
+
+            if (piece.type === 'p') pstVal = PAWN_PST[pstRow][pstCol];
+            else if (piece.type === 'n') pstVal = KNIGHT_PST[pstRow][pstCol];
+            else if (piece.type === 'b') pstVal = BISHOP_PST[pstRow][pstCol];
+            else if (piece.type === 'r') pstVal = ROOK_PST[pstRow][pstCol];
+            else if (piece.type === 'q') pstVal = QUEEN_PST[pstRow][pstCol];
+            else if (piece.type === 'k') pstVal = KING_PST[pstRow][pstCol];
+
+            const totalVal = baseVal + pstVal;
+            score += piece.color === 'b' ? totalVal : -totalVal;
           }
         }
         return score;
       };
 
-      const minimax = (c: any, d: number, alpha: number, beta: number, maximizing: boolean): number => {
+      const minimax = (c: Chess, d: number, alpha: number, beta: number, max: boolean): number => {
         if (d === 0 || c.isGameOver()) return evaluateBoard(c);
-        const moves = c.moves();
-        if (maximizing) {
-          let maxEval = -Infinity;
-          for (const m of moves) {
+        const ms = c.moves({ verbose: true });
+        ms.sort((a: any, b: any) => (b.flags.includes('c') ? 1 : 0) - (a.flags.includes('c') ? 1 : 0));
+
+        if (max) {
+          let best = -Infinity;
+          for (const m of ms) {
             c.move(m);
-            const ev = minimax(c, d - 1, alpha, beta, false);
+            const val = minimax(c, d - 1, alpha, beta, false);
             c.undo();
-            maxEval = Math.max(maxEval, ev);
-            alpha = Math.max(alpha, ev);
+            best = Math.max(best, val);
+            alpha = Math.max(alpha, best);
             if (beta <= alpha) break;
           }
-          return maxEval;
+          return best;
         } else {
-          let minEval = Infinity;
-          for (const m of moves) {
+          let best = Infinity;
+          for (const m of ms) {
             c.move(m);
-            const ev = minimax(c, d - 1, alpha, beta, true);
+            const val = minimax(c, d - 1, alpha, beta, true);
             c.undo();
-            minEval = Math.min(minEval, ev);
-            beta = Math.min(beta, ev);
+            best = Math.min(best, val);
+            beta = Math.min(beta, best);
             if (beta <= alpha) break;
           }
-          return minEval;
+          return best;
         }
       };
 
-      let bestScore = isMaximizing ? -Infinity : Infinity;
-      let bestMoves: any[] = [];
-
-      // Add slight randomness to not be completely deterministic
-      const sortedMoves = legalMoves.sort(() => Math.random() - 0.5);
-
-      for (const move of sortedMoves) {
-        chess.move(move);
-        const score = minimax(chess, depth - 1, -Infinity, Infinity, !isMaximizing);
-        chess.undo();
-
-        if (isMaximizing) {
+      if (level === 'intermediate' && Math.random() < 0.15) {
+        selectedMove = legalMoves[Math.floor(Math.random() * legalMoves.length)];
+      } else {
+        let bestScore = -Infinity;
+        let bestMove = legalMoves[0];
+        for (const m of legalMoves) {
+          chess.move(m);
+          const score = minimax(chess, depth - 1, -Infinity, Infinity, false);
+          chess.undo();
           if (score > bestScore) {
             bestScore = score;
-            bestMoves = [move];
-          } else if (score === bestScore) {
-            bestMoves.push(move);
-          }
-        } else {
-          if (score < bestScore) {
-            bestScore = score;
-            bestMoves = [move];
-          } else if (score === bestScore) {
-            bestMoves.push(move);
+            bestMove = m;
           }
         }
-      }
-      
-      // If intermediate, pick randomly from top moves or sometimes make a sub-optimal move
-      if (level === 'intermediate' && Math.random() < 0.3) {
-         selectedMove = legalMoves[Math.floor(Math.random() * legalMoves.length)];
-      } else {
-         selectedMove = bestMoves[Math.floor(Math.random() * bestMoves.length)] || legalMoves[0];
+        selectedMove = bestMove;
       }
     }
 

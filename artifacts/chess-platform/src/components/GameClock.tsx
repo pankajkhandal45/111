@@ -2,27 +2,41 @@ import React, { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 interface GameClockProps {
-  timeMs: number;
+  timeMs: number | null;
   isActive: boolean;
   color: 'white' | 'black';
 }
 
 export function GameClock({ timeMs, isActive, color }: GameClockProps) {
-  const [timeLeft, setTimeLeft] = useState(timeMs);
+  const [timeLeft, setTimeLeft] = useState<number | null>(timeMs);
 
   useEffect(() => {
     setTimeLeft(timeMs);
   }, [timeMs]);
 
   useEffect(() => {
-    if (!isActive) return;
+    if (!isActive || timeMs === null) return;
 
     const interval = setInterval(() => {
-      setTimeLeft((prev) => Math.max(0, prev - 100)); // Update every 100ms
+      setTimeLeft((prev) => (prev != null ? Math.max(0, prev - 100) : null)); // Update every 100ms
     }, 100);
 
     return () => clearInterval(interval);
-  }, [isActive]);
+  }, [isActive, timeMs]);
+
+  if (timeMs === null || timeLeft === null) {
+    return (
+      <div className={cn(
+        "px-4 py-2 rounded-md font-mono text-xl font-bold shadow-sm flex items-center justify-center min-w-[120px]",
+        color === 'white' 
+          ? "bg-white text-black border border-gray-200" 
+          : "bg-gray-900 text-white border border-gray-800",
+        isActive && "ring-2 ring-primary ring-offset-2"
+      )}>
+        ∞
+      </div>
+    );
+  }
 
   const formatTime = (ms: number) => {
     const totalSeconds = Math.ceil(ms / 1000);
