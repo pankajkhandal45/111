@@ -159,10 +159,18 @@ router.post("/auth/heartbeat", requireAuth, async (req: AuthRequest, res) => {
 
 // GET /api/auth/me
 router.get("/auth/me", requireAuth, async (req: AuthRequest, res) => {
-  res.json(formatUser(req.user!));
+  try {
+    const [rating] = await db.select().from(ratingsTable).where(eq(ratingsTable.userId, req.user!.id)).limit(1);
+    const ratings = rating
+      ? { bullet: rating.bullet, blitz: rating.blitz, rapid: rating.rapid, classical: rating.classical, puzzleRating: rating.puzzleRating }
+      : { bullet: 800, blitz: 800, rapid: 800, classical: 800, puzzleRating: 800 };
+    res.json(formatUser(req.user!, ratings));
+  } catch {
+    res.json(formatUser(req.user!));
+  }
 });
 
-export function formatUser(user: typeof usersTable.$inferSelect) {
+export function formatUser(user: typeof usersTable.$inferSelect, ratings?: any) {
   return {
     id: user.id,
     username: user.username,
@@ -173,6 +181,7 @@ export function formatUser(user: typeof usersTable.$inferSelect) {
     bio: user.bio,
     role: user.role,
     createdAt: user.createdAt,
+    ...(ratings ? { ratings } : {}),
   };
 }
 

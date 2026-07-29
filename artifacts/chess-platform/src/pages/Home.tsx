@@ -106,12 +106,31 @@ function RatingCircle({
 
 export default function Home() {
   const { user, isLoading: authLoading } = useAuth();
+
+  const [cachedDashboard, setCachedDashboard] = React.useState<any>(() => {
+    try {
+      const saved = localStorage.getItem('chess_cached_dashboard');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const { data: dashboard, isLoading: dashboardLoading } = useGetDashboard({
     query: {
       queryKey: ['/api/dashboard'],
       enabled: !!user
     }
   });
+
+  React.useEffect(() => {
+    if (dashboard) {
+      setCachedDashboard(dashboard);
+      try {
+        localStorage.setItem('chess_cached_dashboard', JSON.stringify(dashboard));
+      } catch { /* ignore quota errors */ }
+    }
+  }, [dashboard]);
 
   if (authLoading && !user) {
     return (
@@ -182,9 +201,13 @@ export default function Home() {
   }
 
   // Authenticated User Dashboard
-  const ratings: any = dashboard?.ratings || { bullet: 800, blitz: 800, rapid: 800, classical: 800, puzzleRating: 800 };
-  const stats = dashboard?.stats || { totalGames: 0, wins: 0, losses: 0, draws: 0, winRate: 0, bestRating: 800, currentStreak: 0 };
-  
+  const activeDashboard = dashboard || cachedDashboard;
+  const userRatings = (user as any)?.ratings;
+  const defaultRatings = userRatings || { bullet: 800, blitz: 800, rapid: 800, classical: 800, puzzleRating: 800 };
+
+  const ratings: any = activeDashboard?.ratings || defaultRatings;
+  const stats = activeDashboard?.stats || { totalGames: 0, wins: 0, losses: 0, draws: 0, winRate: 0, bestRating: 800, currentStreak: 0 };
+
   const bestElo = Math.max(ratings.bullet, ratings.blitz, ratings.rapid, ratings.classical);
   const bestTier = getRankTier(bestElo);
 
@@ -194,7 +217,7 @@ export default function Home() {
   const losses = stats.losses;
   const draws = stats.draws;
 
-  const recentGames = dashboard?.recentGames || [];
+  const recentGames = activeDashboard?.recentGames || [];
 
   return (
     <div className="space-y-8 pb-12">
@@ -362,7 +385,7 @@ export default function Home() {
           </Button>
         </div>
 
-        {dashboardLoading && !dashboard ? (
+        {dashboardLoading && !activeDashboard ? (
           <div className="space-y-2 animate-pulse">
             <div className="h-16 bg-muted/30 rounded-xl" />
             <div className="h-16 bg-muted/30 rounded-xl" />
