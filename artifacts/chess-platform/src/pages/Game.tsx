@@ -488,6 +488,7 @@ export default function Game() {
     if (!game || game.mode !== 'bot' || game.status !== 'active') return;
     if (chess.turn() !== 'b') return;
     if (chess.isGameOver()) return;
+    if (makeMove.isPending) return;
 
     const botLevel = (game as any).botLevel || 'intermediate';
 

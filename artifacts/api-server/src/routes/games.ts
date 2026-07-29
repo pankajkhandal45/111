@@ -445,6 +445,15 @@ router.post("/games/:id/move", requireAuth, async (req: AuthRequest, res) => {
       }
     }
 
+    // If bot game and still active, compute bot move synchronously (~1-2ms!)
+    if (game.mode === "bot" && status === "active" && chess.turn() === "b") {
+      try {
+        await computeBotMove(id, newPgn, newFen, game.botLevel || "intermediate");
+      } catch (err) {
+        console.error("Bot move execution error:", err);
+      }
+    }
+
     const updatedGame = await getFullGame(id);
     // Push real-time update to all SSE subscribers of this game
     pushGameUpdate(id, updatedGame);
@@ -790,9 +799,9 @@ async function computeBotMove(gameId: number, pgn: string, fen: string, level: s
     } else {
       const depth = level === 'intermediate' ? 1
         : level === 'advanced' ? 2
-        : level === 'expert' ? 3
-        : level === 'master' ? 3
-        : 4;
+        : level === 'expert' ? 2
+        : level === 'master' ? 2
+        : 3;
 
       const PAWN_PST = [
         [0,  0,  0,  0,  0,  0,  0,  0],
