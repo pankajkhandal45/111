@@ -195,6 +195,7 @@ router.post("/games", requireAuth, async (req: AuthRequest, res) => {
       blackTimeMs: timeMs,
       roomCode: code,
       status: (mode === "online" || mode === "private") ? "waiting" : "active",
+      updatedAt: new Date(),
     }).returning();
 
     // If inviting a friend, store their info (optional invite - they still need to join via code)
@@ -966,13 +967,22 @@ async function computeBotMove(gameId: number, pgn: string, fen: string, level: s
       status = "finished"; result = "draw"; resultReason = chess.isStalemate() ? "stalemate" : "draw";
     }
 
+    const [gameInfo] = await db.select().from(gamesTable).where(eq(gamesTable.id, gameId)).limit(1);
+    const now = new Date();
+    const botElapsedMs = gameInfo?.updatedAt ? Math.max(0, now.getTime() - new Date(gameInfo.updatedAt).getTime()) : 0;
+    let blackTimeMs = gameInfo?.blackTimeMs ?? null;
+    if (blackTimeMs !== null) {
+      blackTimeMs = Math.max(0, blackTimeMs - botElapsedMs);
+    }
+
     await db.update(gamesTable).set({
       fen: chess.fen(),
       pgn: chess.pgn(),
+      blackTimeMs,
       status: status as any,
       result: result as any,
       resultReason,
-      updatedAt: new Date(),
+      updatedAt: now,
     }).where(eq(gamesTable.id, gameId));
 
     if (status === "finished" && result) {
