@@ -448,25 +448,6 @@ router.post("/games/:id/move", requireAuth, async (req: AuthRequest, res) => {
     // Push real-time update to all SSE subscribers of this game
     pushGameUpdate(id, updatedGame);
     res.json(updatedGame);
-
-    // If bot game and not over, compute bot move in background (non-blocking)
-    if (game.mode === "bot" && status === "active") {
-      setImmediate(async () => {
-        try {
-          // Reload current state — game may have changed (resign/draw) before this fires
-          const [currentGame] = await db.select().from(gamesTable).where(eq(gamesTable.id, id)).limit(1);
-          if (!currentGame || currentGame.status !== "active") return; // game already over
-          const verifyChess = new Chess();
-          try { verifyChess.loadPgn(currentGame.pgn || ""); } catch { verifyChess.load(currentGame.fen); }
-          if (verifyChess.turn() !== 'b') return; // not bot's turn (bot is always black)
-          await computeBotMove(id, currentGame.pgn || "", currentGame.fen, currentGame.botLevel || "easy");
-          const botUpdatedGame = await getFullGame(id);
-          if (botUpdatedGame) pushGameUpdate(id, botUpdatedGame);
-        } catch (err) {
-          console.error("Background bot move error:", err);
-        }
-      });
-    }
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Failed to make move" });
