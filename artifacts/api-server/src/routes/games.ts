@@ -342,8 +342,9 @@ router.post("/games/:id/move", requireAuth, async (req: AuthRequest, res) => {
     }
     
     // Enforce turn: white can only move on white's turn, black on black's turn
-    // (local games allow either player to move either side)
-    if (!isLocal) {
+    // (local and bot games allow either player/client to submit moves)
+    const isBot = game.mode === "bot";
+    if (!isLocal && !isBot) {
       const expectedTurn = chess.turn(); // 'w' or 'b'
       if (expectedTurn === 'w' && !isWhite) {
         res.status(400).json({ error: "It is not your turn" });
