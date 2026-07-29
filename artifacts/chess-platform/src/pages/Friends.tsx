@@ -12,7 +12,7 @@ import { useAuth } from '@/context/AuthContext';
 
 export default function Friends() {
   const { token } = useAuth();
-  const { data: friends, isLoading: isFriendsLoading } = useGetFriends({ query: { refetchInterval: 60_000 } });
+  const { data: friends, isLoading: isFriendsLoading } = useGetFriends({ query: { queryKey: ['/api/friends'], refetchInterval: 60_000 } });
   const { data: requests, isLoading: isRequestsLoading } = useGetFriendRequests();
   
   const queryClient = useQueryClient();

@@ -113,7 +113,7 @@ export default function Home() {
     }
   });
 
-  if (authLoading || (user && dashboardLoading)) {
+  if (authLoading && !user) {
     return (
       <div className="space-y-6 animate-pulse p-2">
         <div className="h-44 bg-muted/40 rounded-2xl" />
@@ -362,7 +362,12 @@ export default function Home() {
           </Button>
         </div>
 
-        {recentGames.length === 0 ? (
+        {dashboardLoading && !dashboard ? (
+          <div className="space-y-2 animate-pulse">
+            <div className="h-16 bg-muted/30 rounded-xl" />
+            <div className="h-16 bg-muted/30 rounded-xl" />
+          </div>
+        ) : recentGames.length === 0 ? (
           <Card className="p-8 text-center space-y-3 border-dashed">
             <Swords className="w-8 h-8 mx-auto text-muted-foreground/50" />
             <p className="text-sm text-muted-foreground">No recent games played yet.</p>

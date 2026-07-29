@@ -219,40 +219,58 @@ router.delete("/users/me", requireAuth, async (req: AuthRequest, res) => {
 router.get("/dashboard", requireAuth, async (req: AuthRequest, res) => {
   try {
     const userId = req.userId!;
-    const [rating] = await db.select().from(ratingsTable).where(eq(ratingsTable.userId, userId)).limit(1);
-    // Always show actual rating; if no row yet, default is 800 (matches DB default)
+    const today = new Date().toISOString().split("T")[0];
+
+    const [
+      ratingsRows,
+      recentGames,
+      games,
+      dailyPuzzleRow,
+      streakRows,
+    ] = await Promise.all([
+      db.select().from(ratingsTable).where(eq(ratingsTable.userId, userId)).limit(1),
+      db.query.gamesTable.findMany({
+        where: and(
+          or(eq(gamesTable.whitePlayerId, userId), eq(gamesTable.blackPlayerId, userId)),
+          eq(gamesTable.status, "finished")
+        ),
+        orderBy: [desc(gamesTable.createdAt)],
+        limit: 5,
+        with: {
+          whitePlayer: { columns: { id: true, username: true, avatar: true } },
+          blackPlayer: { columns: { id: true, username: true, avatar: true } },
+        },
+      }),
+      db.select({
+        whitePlayerId: gamesTable.whitePlayerId,
+        blackPlayerId: gamesTable.blackPlayerId,
+        result: gamesTable.result,
+        whiteAccuracy: gamesTable.whiteAccuracy,
+        blackAccuracy: gamesTable.blackAccuracy,
+      }).from(gamesTable).where(
+        and(
+          or(eq(gamesTable.whitePlayerId, userId), eq(gamesTable.blackPlayerId, userId)),
+          eq(gamesTable.status, "finished"),
+          ne(gamesTable.mode, "local")
+        )
+      ),
+      db.query.puzzlesTable.findFirst({
+        where: or(
+          and(eq(puzzlesTable.isDaily, true), eq(puzzlesTable.dailyDate, today)),
+          eq(puzzlesTable.isDaily, true)
+        ),
+      }),
+      db.select().from(puzzleStreaksTable).where(eq(puzzleStreaksTable.userId, userId)).limit(1),
+    ]);
+
+    const rating = ratingsRows[0];
+    const streak = streakRows[0];
+    let dailyPuzzle = dailyPuzzleRow || await db.query.puzzlesTable.findFirst();
+
     const ratings = rating
       ? { bullet: rating.bullet, blitz: rating.blitz, rapid: rating.rapid, classical: rating.classical, puzzleRating: rating.puzzleRating }
       : { bullet: 800, blitz: 800, rapid: 800, classical: 800, puzzleRating: 800 };
 
-    // Recent games
-    const recentGames = await db.query.gamesTable.findMany({
-      where: and(
-        or(eq(gamesTable.whitePlayerId, userId), eq(gamesTable.blackPlayerId, userId)),
-        eq(gamesTable.status, "finished")
-      ),
-      orderBy: [desc(gamesTable.createdAt)],
-      limit: 5,
-      with: {
-        whitePlayer: { columns: { id: true, username: true, avatar: true } },
-        blackPlayer: { columns: { id: true, username: true, avatar: true } },
-      },
-    });
-
-    // Stats (exclude local pass-and-play games from competitive stats)
-    const games = await db.select({
-      whitePlayerId: gamesTable.whitePlayerId,
-      blackPlayerId: gamesTable.blackPlayerId,
-      result: gamesTable.result,
-      whiteAccuracy: gamesTable.whiteAccuracy,
-      blackAccuracy: gamesTable.blackAccuracy,
-    }).from(gamesTable).where(
-      and(
-        or(eq(gamesTable.whitePlayerId, userId), eq(gamesTable.blackPlayerId, userId)),
-        eq(gamesTable.status, "finished"),
-        ne(gamesTable.mode, "local")
-      )
-    );
     let wins = 0, losses = 0, draws = 0;
     const accuracies: number[] = [];
     for (const g of games) {
@@ -263,21 +281,6 @@ router.get("/dashboard", requireAuth, async (req: AuthRequest, res) => {
       const acc = isWhite ? g.whiteAccuracy : g.blackAccuracy;
       if (acc != null) accuracies.push(acc);
     }
-
-    const today = new Date().toISOString().split("T")[0];
-    let dailyPuzzle = await db.query.puzzlesTable.findFirst({
-      where: and(eq(puzzlesTable.isDaily, true), eq(puzzlesTable.dailyDate, today)),
-    });
-    if (!dailyPuzzle) {
-      dailyPuzzle = await db.query.puzzlesTable.findFirst({
-        where: eq(puzzlesTable.isDaily, true),
-      });
-    }
-    if (!dailyPuzzle) {
-      dailyPuzzle = await db.query.puzzlesTable.findFirst();
-    }
-
-    const [streak] = await db.select().from(puzzleStreaksTable).where(eq(puzzleStreaksTable.userId, userId)).limit(1);
 
     res.json({
       ratings,

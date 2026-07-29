@@ -14,8 +14,8 @@ export default function Analysis() {
   const gameId = parseInt(id, 10);
   const [, setLocation] = useLocation();
 
-  const { data: game, isLoading: isGameLoading } = useGetGame(gameId, { query: { enabled: !!gameId } });
-  const { data: analysis, isLoading: isAnalysisLoading } = useGetGameAnalysis(gameId, { query: { enabled: !!gameId } });
+  const { data: game, isLoading: isGameLoading } = useGetGame(gameId, { query: { queryKey: ['/api/games', gameId], enabled: !!gameId } });
+  const { data: analysis, isLoading: isAnalysisLoading } = useGetGameAnalysis(gameId, { query: { queryKey: ['/api/games', gameId, 'analysis'], enabled: !!gameId } });
 
   const [activeMoveIndex, setActiveMoveIndex] = useState<number>(-1);
   const [chess] = useState(() => new Chess());

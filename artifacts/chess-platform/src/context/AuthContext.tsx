@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { useGetMe } from "@workspace/api-client-react";
+import { useGetMe, type User } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { User } from "@workspace/api-client-react/src/generated/api.schemas";
 
 interface AuthContextType {
   user: User | null;
@@ -46,6 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const { data: remoteUser, isLoading: isQueryLoading, error } = useGetMe({
     query: {
+      queryKey: ['/api/auth/me'],
       enabled: !!token,
       retry: false,
     },

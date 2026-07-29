@@ -65,7 +65,7 @@ export function VoiceChat({
 
     // My volume
     if (myAnalyser.current && myDataArr.current) {
-      myAnalyser.current.getByteFrequencyData(myDataArr.current);
+      myAnalyser.current.getByteFrequencyData(myDataArr.current as any);
       const avg = myDataArr.current.reduce((a, b) => a + b, 0) / myDataArr.current.length;
       const pct = Math.min(100, avg * 2.8);
       setMyVol(pct);
@@ -74,7 +74,7 @@ export function VoiceChat({
 
     // Remote volume
     if (remoteAnalyser.current && remoteDataArr.current) {
-      remoteAnalyser.current.getByteFrequencyData(remoteDataArr.current);
+      remoteAnalyser.current.getByteFrequencyData(remoteDataArr.current as any);
       const avg = remoteDataArr.current.reduce((a, b) => a + b, 0) / remoteDataArr.current.length;
       const pct = Math.min(100, avg * 2.8);
       setRemoteVol(pct);

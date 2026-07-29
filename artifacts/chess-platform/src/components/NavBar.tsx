@@ -55,6 +55,7 @@ export function NavBar() {
 
   const { data: notifications } = useGetNotifications({
     query: {
+      queryKey: ['/api/notifications'],
       enabled: !!user,
       refetchInterval: 3000,
       staleTime: 0,
