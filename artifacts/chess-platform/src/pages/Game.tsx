@@ -411,6 +411,9 @@ export default function Game() {
   const [showResignConfirm, setShowResignConfirm] = useState(false);
   const [rotatePieces, setRotatePieces] = useState(false);
   const prevStatusRef = useRef<string | undefined>(undefined);
+  // Track when current player's turn started (client-side) so we can send
+  // accurate timeTakenMs to the server, eliminating Vercel network lag drift.
+  const turnStartRef = useRef<number>(Date.now());
 
   const makeMove = useMakeMove();
 
@@ -459,6 +462,8 @@ export default function Game() {
           // Ignore SSE updates that are older than our optimistic state
           if (!currentGame || !currentGame.moves || !updatedGame.moves || updatedGame.moves.length >= currentGame.moves.length) {
             queryClient.setQueryData(getGetGameQueryKey(gameId), updatedGame);
+            // Opponent just moved — reset our turn timer
+            turnStartRef.current = Date.now();
           }
         } catch { /* ignore malformed data */ }
       };
@@ -736,6 +741,9 @@ export default function Game() {
     // Block if bot is thinking (bot plays black)
     if (isBot && chess.turn() === 'b') return;
 
+    // Capture client-side elapsed time BEFORE anything async happens
+    const timeTakenMs = Date.now() - turnStartRef.current;
+
     // Local validation
     try {
       const moveResult = chess.move({ from, to, promotion: promotion || 'q' });
@@ -743,6 +751,8 @@ export default function Game() {
         const newFen = chess.fen();
         // Update local chess state speculatively
         setChess(new Chess(newFen));
+        // Reset turn timer for next turn
+        turnStartRef.current = Date.now();
 
         // Cancel any in-flight polls so they don't return old state and cause rubber-banding
         queryClient.cancelQueries({ queryKey: getGetGameQueryKey(gameId) });
@@ -773,11 +783,13 @@ export default function Game() {
         queryClient.setQueryData(getGetGameQueryKey(gameId), optimisticGame);
 
         makeMove.mutate(
-          { id: gameId, data: { from, to, promotion } },
+          { id: gameId, data: { from, to, promotion, timeTakenMs } },
           {
             onSuccess: (updatedGame) => {
               // Server returns the true updated game (with proper DB IDs and timestamps)
               queryClient.setQueryData(getGetGameQueryKey(gameId), updatedGame);
+              // Reset turn timer when opponent's turn begins
+              turnStartRef.current = Date.now();
             },
             onError: () => {
               // Revert on error by refetching from server

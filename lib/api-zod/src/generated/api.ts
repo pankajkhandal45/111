@@ -281,7 +281,8 @@ export const MakeMoveParams = zod.object({
 export const MakeMoveBody = zod.object({
   "from": zod.string(),
   "to": zod.string(),
-  "promotion": zod.string().nullish()
+  "promotion": zod.string().nullish(),
+  "timeTakenMs": zod.number().nullish().describe('Client-measured milliseconds elapsed since turn start (used for accurate time deduction)')
 })
 
 export const MakeMoveResponse = zod.object({

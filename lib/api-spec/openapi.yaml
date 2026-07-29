@@ -740,6 +740,9 @@ components:
           type: string
         promotion:
           type: ["string", "null"]
+        timeTakenMs:
+          type: ["number", "null"]
+          description: Client-measured milliseconds elapsed since turn start (used for accurate time deduction)
 
     Game:
       type: object

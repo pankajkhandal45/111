@@ -11,4 +11,9 @@ export interface MoveInput {
   to: string;
   /** @nullable */
   promotion?: string | null;
+  /**
+     * Client-measured milliseconds elapsed since turn start (used for accurate time deduction)
+     * @nullable
+     */
+  timeTakenMs?: number | null;
 }

@@ -359,7 +359,13 @@ router.post("/games/:id/move", requireAuth, async (req: AuthRequest, res) => {
 
     // Calculate elapsed time for the player who just moved
     const now = new Date();
-    const elapsedMs = game.updatedAt ? Math.max(0, now.getTime() - new Date(game.updatedAt).getTime()) : 0;
+    const { timeTakenMs } = req.body;
+    let elapsedMs = 0;
+    if (typeof timeTakenMs === "number" && timeTakenMs > 0 && timeTakenMs < 3600000) {
+      elapsedMs = Math.round(timeTakenMs);
+    } else {
+      elapsedMs = game.updatedAt ? Math.max(0, now.getTime() - new Date(game.updatedAt).getTime()) : 0;
+    }
 
     let whiteTimeMs = game.whiteTimeMs;
     let blackTimeMs = game.blackTimeMs;
