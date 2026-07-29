@@ -10,9 +10,21 @@ interface GameClockProps {
 export function GameClock({ timeMs, isActive, color }: GameClockProps) {
   const [timeLeft, setTimeLeft] = useState<number | null>(timeMs);
 
+  // Sync with prop when turn changes or on large server drift (> 2500ms)
   useEffect(() => {
-    setTimeLeft(timeMs);
-  }, [timeMs]);
+    if (timeMs === null) {
+      setTimeLeft(null);
+      return;
+    }
+    setTimeLeft((prev) => {
+      if (prev === null) return timeMs;
+      const diff = Math.abs(prev - timeMs);
+      if (diff > 2500 || !isActive) {
+        return timeMs;
+      }
+      return prev;
+    });
+  }, [timeMs, isActive]);
 
   useEffect(() => {
     if (!isActive || timeMs === null) return;

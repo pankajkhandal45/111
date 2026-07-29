@@ -512,9 +512,9 @@ export default function Game() {
         // Intermediate, Advanced, Expert, Master, Grandmaster
         const depth = botLevel === 'intermediate' ? 1
           : botLevel === 'advanced' ? 2
-          : botLevel === 'expert' ? 3
-          : botLevel === 'master' ? 3
-          : 4; // grandmaster
+          : botLevel === 'expert' ? 2
+          : botLevel === 'master' ? 2
+          : 3; // grandmaster (ultra-fast PST search)
 
         const PAWN_PST = [
           [0,  0,  0,  0,  0,  0,  0,  0],
@@ -661,7 +661,7 @@ export default function Game() {
         { id: gameId, data: { from: selectedMove.from, to: selectedMove.to, promotion: selectedMove.promotion } },
         { onSuccess: (updatedGame) => queryClient.setQueryData(getGetGameQueryKey(gameId), updatedGame) }
       );
-    }, 400);
+    }, 250);
 
     return () => clearTimeout(timer);
   }, [game?.status, game?.mode, chess.fen()]);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useCreateGame, getBaseUrl } from '@workspace/api-client-react';
+import { useCreateGame, getBaseUrl, getGetGameQueryKey } from '@workspace/api-client-react';
 import { useLocation, useSearch } from 'wouter';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Loader2, Globe, Cpu, Users, Lock, Copy, Check, Link2, UserPlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 const TIME_CONTROLS = {
   bullet: [
@@ -82,6 +82,8 @@ export default function Play() {
     },
   });
 
+  const queryClient = useQueryClient();
+
   const handleCreateGame = () => {
     createGame.mutate(
       {
@@ -96,6 +98,7 @@ export default function Play() {
           if (mode === 'private') {
             setCreatedGame({ id: data.id, roomCode: data.roomCode! });
           } else {
+            queryClient.setQueryData(getGetGameQueryKey(data.id), data);
             setLocation(`/game/${data.id}`);
           }
         },

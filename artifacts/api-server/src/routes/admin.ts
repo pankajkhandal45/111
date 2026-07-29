@@ -134,12 +134,30 @@ router.patch("/admin/users/:id/role", requireAdmin, async (req: AuthRequest, res
 router.delete("/admin/users/:id", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id as string);
+    if (isNaN(id)) {
+      res.status(400).json({ error: "Invalid user ID" });
+      return;
+    }
     if (id === req.userId) {
       res.status(400).json({ error: "Cannot delete yourself" });
       return;
     }
-    await db.delete(usersTable).where(eq(usersTable.id, id));
-    res.json({ success: true });
+
+    // Delete games involving this user first to avoid SQLite foreign key constraint failure
+    await db.delete(gamesTable).where(
+      or(
+        eq(gamesTable.whitePlayerId, id),
+        eq(gamesTable.blackPlayerId, id)
+      )
+    );
+
+    const [deleted] = await db.delete(usersTable).where(eq(usersTable.id, id)).returning();
+    if (!deleted) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    res.json({ success: true, id });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Failed to delete user" });
