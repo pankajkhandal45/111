@@ -969,13 +969,23 @@ async function computeBotMove(gameId: number, pgn: string, fen: string, level: s
       status = "finished";
       result = chess.turn() === "w" ? "black" : "white";
       resultReason = "checkmate";
-    } else if (chess.isStalemate() || chess.isDraw()) {
-      status = "finished"; result = "draw"; resultReason = chess.isStalemate() ? "stalemate" : "draw";
+    } else if (chess.isStalemate()) {
+      status = "finished"; result = "draw"; resultReason = "stalemate";
+    } else if (chess.isInsufficientMaterial()) {
+      status = "finished"; result = "draw"; resultReason = "insufficient_material";
+    } else if (chess.isThreefoldRepetition()) {
+      status = "finished"; result = "draw"; resultReason = "repetition";
+    } else if (chess.isDraw()) {
+      status = "finished"; result = "draw"; resultReason = "fifty_move_rule";
     }
 
     const [gameInfo] = await db.select().from(gamesTable).where(eq(gamesTable.id, gameId)).limit(1);
     const now = new Date();
-    const botElapsedMs = gameInfo?.updatedAt ? Math.max(0, now.getTime() - new Date(gameInfo.updatedAt).getTime()) : 0;
+    // Cap bot elapsed time at 10s to prevent large deductions on Vercel cold starts
+    const rawBotElapsed = gameInfo?.updatedAt
+      ? Math.max(0, now.getTime() - new Date(gameInfo.updatedAt).getTime())
+      : 0;
+    const botElapsedMs = Math.min(rawBotElapsed, 10000);
     let blackTimeMs = gameInfo?.blackTimeMs ?? null;
     if (blackTimeMs !== null) {
       blackTimeMs = Math.max(0, blackTimeMs - botElapsedMs);
@@ -1009,6 +1019,14 @@ async function computeBotMove(gameId: number, pgn: string, fen: string, level: s
         console.error("Bot game rating update error:", err);
       }
     }
+
+    // Push real-time SSE update to client immediately after bot move
+    // so the board updates without waiting for the next poll
+    try {
+      const updatedGame = await getFullGame(gameId);
+      if (updatedGame) pushGameUpdate(gameId, updatedGame);
+    } catch { /* ignore */ }
+
   } catch (err) {
     console.error("Bot move error:", err);
   }

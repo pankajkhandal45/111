@@ -418,12 +418,15 @@ export default function Game() {
   const makeMove = useMakeMove();
 
   // Polling fallback — 2s for active games so moves never lag more than 2s
+  // Bot games: server pushes updates via SSE after each move (no polling needed)
   const { data: game, isLoading } = useGetGame(gameId, {
     query: {
       queryKey: getGetGameQueryKey(gameId),
       enabled: !!gameId && !makeMove.isPending, // Disable polling while making a move to prevent rubber-banding
       refetchInterval: (query: any) => {
         const status = query.state.data?.status;
+        const mode = query.state.data?.mode;
+        if (mode === 'bot') return false;        // SSE handles bot game updates; polling causes interference
         if (status === 'active') return 2000;    // 2s fallback when playing
         if (status === 'waiting') return 2000;   // 2s fallback while waiting for opponent
         return false;
@@ -488,190 +491,10 @@ export default function Game() {
     };
   }, [gameId, queryClient]);
 
-  // ── Client-side bot logic (runs in browser, distinct per level) ─────────────
-  useEffect(() => {
-    if (!game || game.mode !== 'bot' || game.status !== 'active') return;
-    if (chess.turn() !== 'b') return;
-    if (chess.isGameOver()) return;
-    if (makeMove.isPending) return;
-
-    const botLevel = (game as any).botLevel || 'intermediate';
-
-    const timer = setTimeout(() => {
-      const moves = chess.moves({ verbose: true });
-      if (moves.length === 0) return;
-
-      let selectedMove: any;
-
-      if (botLevel === 'beginner') {
-        // Beginner: 100% random legal move (~600 Elo)
-        selectedMove = moves[Math.floor(Math.random() * moves.length)];
-      } else if (botLevel === 'easy') {
-        // Easy: 70% random, 30% capture/positional (~900 Elo)
-        const captures = moves.filter((m: any) => m.flags.includes('c'));
-        if (captures.length > 0 && Math.random() < 0.6) {
-          selectedMove = captures[Math.floor(Math.random() * captures.length)];
-        } else {
-          selectedMove = moves[Math.floor(Math.random() * moves.length)];
-        }
-      } else {
-        // Intermediate, Advanced, Expert, Master, Grandmaster
-        const depth = botLevel === 'intermediate' ? 1
-          : botLevel === 'advanced' ? 2
-          : botLevel === 'expert' ? 2
-          : botLevel === 'master' ? 2
-          : 3; // grandmaster (ultra-fast PST search)
-
-        const PAWN_PST = [
-          [0,  0,  0,  0,  0,  0,  0,  0],
-          [50, 50, 50, 50, 50, 50, 50, 50],
-          [10, 10, 20, 30, 30, 20, 10, 10],
-          [ 5,  5, 10, 25, 25, 10,  5,  5],
-          [ 0,  0,  0, 20, 20,  0,  0,  0],
-          [ 5, -5,-10,  0,  0,-10, -5,  5],
-          [ 5, 10, 10,-20,-20, 10, 10,  5],
-          [ 0,  0,  0,  0,  0,  0,  0,  0]
-        ];
-        const KNIGHT_PST = [
-          [-50,-40,-30,-30,-30,-30,-40,-50],
-          [-40,-20,  0,  0,  0,  0,-20,-40],
-          [-30,  0, 10, 15, 15, 10,  0,-30],
-          [-30,  5, 15, 20, 20, 15,  5,-30],
-          [-30,  0, 15, 20, 20, 15,  0,-30],
-          [-30,  5, 10, 15, 15, 10,  5,-30],
-          [-40,-20,  0,  5,  5,  0,-20,-40],
-          [-50,-40,-30,-30,-30,-30,-40,-50]
-        ];
-        const BISHOP_PST = [
-          [-20,-10,-10,-10,-10,-10,-10,-20],
-          [-10,  0,  0,  0,  0,  0,  0,-10],
-          [-10,  0,  5, 10, 10,  5,  0,-10],
-          [-10,  5,  5, 10, 10,  5,  5,-10],
-          [-10,  0, 10, 10, 10, 10,  0,-10],
-          [-10, 10, 10, 10, 10, 10, 10,-10],
-          [-10,  5,  0,  0,  0,  0,  5,-10],
-          [-20,-10,-10,-10,-10,-10,-10,-20]
-        ];
-        const ROOK_PST = [
-          [ 0,  0,  0,  0,  0,  0,  0,  0],
-          [ 5, 10, 10, 10, 10, 10, 10,  5],
-          [-5,  0,  0,  0,  0,  0,  0, -5],
-          [-5,  0,  0,  0,  0,  0,  0, -5],
-          [-5,  0,  0,  0,  0,  0,  0, -5],
-          [-5,  0,  0,  0,  0,  0,  0, -5],
-          [-5,  0,  0,  0,  0,  0,  0, -5],
-          [ 0,  0,  0,  5,  5,  0,  0,  0]
-        ];
-        const QUEEN_PST = [
-          [-20,-10,-10, -5, -5,-10,-10,-20],
-          [-10,  0,  0,  0,  0,  0,  0,-10],
-          [-10,  0,  5,  5,  5,  5,  0,-10],
-          [ -5,  0,  5,  5,  5,  5,  0, -5],
-          [  0,  0,  5,  5,  5,  5,  0,  0],
-          [-10,  5,  5,  5,  5,  5,  0,-10],
-          [-10,  0,  5,  0,  0,  0,  0,-10],
-          [-20,-10,-10, -5, -5,-10,-10,-20]
-        ];
-        const KING_PST = [
-          [-30,-40,-40,-50,-50,-40,-40,-30],
-          [-30,-40,-40,-50,-50,-40,-40,-30],
-          [-30,-40,-40,-50,-50,-40,-40,-30],
-          [-30,-40,-40,-50,-50,-40,-40,-30],
-          [-20,-30,-30,-40,-40,-30,-30,-20],
-          [-10,-20,-20,-20,-20,-20,-20,-10],
-          [ 20, 20,  0,  0,  0,  0, 20, 20],
-          [ 20, 30, 10,  0,  0, 10, 30, 20]
-        ];
-
-        const evaluateBoard = (c: Chess): number => {
-          const PIECE_VALS: Record<string, number> = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 };
-          let score = 0;
-          const board = c.board();
-
-          for (let r = 0; r < 8; r++) {
-            for (let f = 0; f < 8; f++) {
-              const piece = board[r][f];
-              if (!piece) continue;
-
-              const baseVal = PIECE_VALS[piece.type] || 0;
-              let pstVal = 0;
-              const pstRow = piece.color === 'w' ? 7 - r : r;
-              const pstCol = f;
-
-              if (piece.type === 'p') pstVal = PAWN_PST[pstRow][pstCol];
-              else if (piece.type === 'n') pstVal = KNIGHT_PST[pstRow][pstCol];
-              else if (piece.type === 'b') pstVal = BISHOP_PST[pstRow][pstCol];
-              else if (piece.type === 'r') pstVal = ROOK_PST[pstRow][pstCol];
-              else if (piece.type === 'q') pstVal = QUEEN_PST[pstRow][pstCol];
-              else if (piece.type === 'k') pstVal = KING_PST[pstRow][pstCol];
-
-              const totalVal = baseVal + pstVal;
-              score += piece.color === 'b' ? totalVal : -totalVal;
-            }
-          }
-          return score;
-        };
-
-        const minimax = (c: Chess, d: number, alpha: number, beta: number, max: boolean): number => {
-          if (d === 0 || c.isGameOver()) return evaluateBoard(c);
-          const ms = c.moves({ verbose: true });
-          // Sort captures first for alpha-beta efficiency
-          ms.sort((a: any, b: any) => (b.flags.includes('c') ? 1 : 0) - (a.flags.includes('c') ? 1 : 0));
-
-          if (max) {
-            let best = -Infinity;
-            for (const m of ms) {
-              c.move(m);
-              const val = minimax(c, d - 1, alpha, beta, false);
-              c.undo();
-              best = Math.max(best, val);
-              alpha = Math.max(alpha, best);
-              if (beta <= alpha) break;
-            }
-            return best;
-          } else {
-            let best = Infinity;
-            for (const m of ms) {
-              c.move(m);
-              const val = minimax(c, d - 1, alpha, beta, true);
-              c.undo();
-              best = Math.min(best, val);
-              beta = Math.min(beta, best);
-              if (beta <= alpha) break;
-            }
-            return best;
-          }
-        };
-
-        // Intermediate has 15% blunder chance
-        if (botLevel === 'intermediate' && Math.random() < 0.15) {
-          selectedMove = moves[Math.floor(Math.random() * moves.length)];
-        } else {
-          let bestScore = -Infinity;
-          let bestMove = moves[0];
-          for (const m of moves) {
-            chess.move(m);
-            // Black wants to maximize evaluateBoard (since black pieces are positive)
-            const score = minimax(chess, depth - 1, -Infinity, Infinity, false);
-            chess.undo();
-            if (score > bestScore) {
-              bestScore = score;
-              bestMove = m;
-            }
-          }
-          selectedMove = bestMove;
-        }
-      }
-
-      makeMove.mutate(
-        { id: gameId, data: { from: selectedMove.from, to: selectedMove.to, promotion: selectedMove.promotion } },
-        { onSuccess: (updatedGame) => queryClient.setQueryData(getGetGameQueryKey(gameId), updatedGame) }
-      );
-    }, 250);
-
-    return () => clearTimeout(timer);
-  }, [game?.status, game?.mode, chess.fen()]);
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── Bot logic is handled entirely server-side (computeBotMove in games.ts) ──
+  // The server computes and saves the bot's reply within the same POST /move
+  // request, then pushes the updated game via SSE. No client-side bot logic
+  // is needed — removing it eliminates double-move race conditions.
   // ─────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {

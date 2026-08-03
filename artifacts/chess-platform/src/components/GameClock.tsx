@@ -10,20 +10,42 @@ interface GameClockProps {
 export function GameClock({ timeMs, isActive, color }: GameClockProps) {
   const [timeLeft, setTimeLeft] = useState<number | null>(timeMs);
   const prevActiveRef = useRef<boolean>(false);
+  const prevTimeMsRef = useRef<number | null>(timeMs);
 
-  // Sync starting time when turn transitions from inactive to active, or on initial load
+  // Sync clock with server value — but prevent backward jumps while active
   useEffect(() => {
     if (timeMs === null) {
       setTimeLeft(null);
+      prevTimeMsRef.current = null;
+      prevActiveRef.current = isActive;
       return;
     }
 
-    // Sync if turn just became active, OR if clock was uninitialized (null)
-    if ((isActive && !prevActiveRef.current) || timeLeft === null) {
+    const justBecameActive = isActive && !prevActiveRef.current;
+    const wasNeverSet = timeLeft === null;
+
+    if (wasNeverSet) {
+      // First time: always accept server value
       setTimeLeft(timeMs);
+    } else if (justBecameActive) {
+      // Turn just switched to this player: accept server value unconditionally
+      setTimeLeft(timeMs);
+    } else if (!isActive) {
+      // Clock is inactive (opponent's turn): always stay in sync with server
+      setTimeLeft(timeMs);
+    } else {
+      // Clock is actively counting down: only accept server value if it's
+      // actually lower than what we have (genuine deduction), NOT higher
+      // (which would cause the visible jump-up bug when bot moves).
+      setTimeLeft((prev) => {
+        if (prev === null) return timeMs;
+        // Accept server value only if it decreased (real time was deducted)
+        return timeMs < prev ? timeMs : prev;
+      });
     }
-    
+
     prevActiveRef.current = isActive;
+    prevTimeMsRef.current = timeMs;
   }, [isActive, timeMs]);
 
   // Tick down every 100ms while turn is active
