@@ -341,6 +341,30 @@ router.post("/notifications/read-all", requireAuth, async (req: AuthRequest, res
   res.json({ success: true });
 });
 
+// DELETE /api/notifications — Delete all notifications
+router.delete("/notifications", requireAuth, async (req: AuthRequest, res) => {
+  const { notificationsTable } = await import("@workspace/db");
+  await db.delete(notificationsTable).where(eq(notificationsTable.userId, req.userId!));
+  res.json({ success: true });
+});
+
+// POST /api/notifications/delete-all — Delete all notifications (alias)
+router.post("/notifications/delete-all", requireAuth, async (req: AuthRequest, res) => {
+  const { notificationsTable } = await import("@workspace/db");
+  await db.delete(notificationsTable).where(eq(notificationsTable.userId, req.userId!));
+  res.json({ success: true });
+});
+
+// DELETE /api/notifications/:id — Delete a single notification
+router.delete("/notifications/:id", requireAuth, async (req: AuthRequest, res) => {
+  const { notificationsTable } = await import("@workspace/db");
+  const id = parseInt(req.params.id as string);
+  await db.delete(notificationsTable)
+    .where(and(eq(notificationsTable.id, id), eq(notificationsTable.userId, req.userId!)));
+  res.json({ success: true });
+});
+
+
 export function formatGameSummary(game: any) {
   const ratings: Record<string, number> = { bullet1: 0, bullet2: 0, blitz3: 0, blitz5: 0, rapid10: 0, rapid15: 0, rapid30: 0, classical60: 0 };
   return {

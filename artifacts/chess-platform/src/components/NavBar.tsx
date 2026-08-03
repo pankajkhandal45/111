@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useGetNotifications } from '@workspace/api-client-react';
 import { useOnlineFriends } from '@/hooks/useOnlineFriends';
 import { useTheme } from '@/components/ThemeProvider';
-import { Bell, User, Settings, LogOut, ShieldCheck, Users, Sun, Moon, Download } from 'lucide-react';
+import { Bell, User, Settings, LogOut, ShieldCheck, Users, Sun, Moon, Download, Check, Trash2, CheckCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -30,6 +30,7 @@ export function NavBar() {
   
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const notifiedIdsRef = React.useRef<Set<number>>(new Set());
+  const isInitializedRef = React.useRef<boolean>(false);
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: any) => {
@@ -64,9 +65,18 @@ export function NavBar() {
   });
   const { data: friends } = useOnlineFriends();
 
-  // Toast alert when new unread notification arrives
+  // Toast alert when new unread notification arrives (fixes duplicate toast on reload)
   useEffect(() => {
     if (!notifications || notifications.length === 0) return;
+
+    if (!isInitializedRef.current) {
+      notifications.forEach((n: any) => {
+        notifiedIdsRef.current.add(n.id);
+      });
+      isInitializedRef.current = true;
+      return;
+    }
+
     notifications.forEach((n: any) => {
       if (!n.isRead && !notifiedIdsRef.current.has(n.id)) {
         notifiedIdsRef.current.add(n.id);
@@ -79,7 +89,8 @@ export function NavBar() {
     });
   }, [notifications]);
 
-  const handleMarkAllRead = async () => {
+  const handleMarkAllRead = async (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     try {
       const base = getBaseUrl();
       const token = localStorage.getItem('chess_token');
@@ -91,21 +102,63 @@ export function NavBar() {
     } catch { /* ignore */ }
   };
 
-  const handleNotificationClick = async (notif: any) => {
+  const handleMarkRead = async (e: React.MouseEvent, notifId: number) => {
+    e.stopPropagation();
     try {
       const base = getBaseUrl();
       const token = localStorage.getItem('chess_token');
-      await fetch(`${base || ''}/api/notifications/${notif.id}/read`, {
+      await fetch(`${base || ''}/api/notifications/${notifId}/read`, {
         method: 'POST',
         headers: { Authorization: token ? `Bearer ${token}` : '' }
       });
       queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
-      if (notif.type === 'friend_request') {
-        setLocation('/friends');
-      } else if (notif.type === 'friend_online' && notif.data?.username) {
-        setLocation(`/profile/${notif.data.username}`);
-      }
     } catch { /* ignore */ }
+  };
+
+  const handleDeleteAll = async (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    try {
+      const base = getBaseUrl();
+      const token = localStorage.getItem('chess_token');
+      await fetch(`${base || ''}/api/notifications/delete-all`, {
+        method: 'POST',
+        headers: { Authorization: token ? `Bearer ${token}` : '' }
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+      toast({ title: "Notifications cleared", duration: 3000 });
+    } catch { /* ignore */ }
+  };
+
+  const handleDeleteNotification = async (e: React.MouseEvent, notifId: number) => {
+    e.stopPropagation();
+    try {
+      const base = getBaseUrl();
+      const token = localStorage.getItem('chess_token');
+      await fetch(`${base || ''}/api/notifications/${notifId}`, {
+        method: 'DELETE',
+        headers: { Authorization: token ? `Bearer ${token}` : '' }
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+    } catch { /* ignore */ }
+  };
+
+  const handleNotificationClick = async (notif: any) => {
+    if (!notif.isRead) {
+      try {
+        const base = getBaseUrl();
+        const token = localStorage.getItem('chess_token');
+        await fetch(`${base || ''}/api/notifications/${notif.id}/read`, {
+          method: 'POST',
+          headers: { Authorization: token ? `Bearer ${token}` : '' }
+        });
+        queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+      } catch { /* ignore */ }
+    }
+    if (notif.type === 'friend_request') {
+      setLocation('/friends');
+    } else if (notif.type === 'friend_online' && notif.data?.username) {
+      setLocation(`/profile/${notif.data.username}`);
+    }
   };
 
   const unreadCount = notifications?.filter((n: any) => !n.isRead).length || 0;
@@ -168,35 +221,75 @@ export function NavBar() {
                     )}
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-80" align="end" forceMount>
-                  <div className="flex items-center justify-between px-3 py-2 border-b">
+                <DropdownMenuContent className="w-80 sm:w-96" align="end" forceMount>
+                  <div className="flex items-center justify-between px-3 py-2 border-b gap-2">
                     <span className="font-semibold text-sm">Notifications</span>
-                    {unreadCount > 0 && (
-                      <Button variant="ghost" size="sm" className="text-xs h-7 text-primary hover:text-primary/80" onClick={handleMarkAllRead}>
-                        Mark all read
-                      </Button>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {unreadCount > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs h-7 px-2 text-primary hover:text-primary/80 flex items-center gap-1"
+                          onClick={handleMarkAllRead}
+                          title="Mark all as read"
+                        >
+                          <CheckCheck className="h-3.5 w-3.5" />
+                          <span>Mark all read</span>
+                        </Button>
+                      )}
+                      {notifications && notifications.length > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs h-7 px-2 text-destructive hover:text-destructive/80 flex items-center gap-1"
+                          onClick={handleDeleteAll}
+                          title="Delete all notifications"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span>Delete all</span>
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <div className="max-h-72 overflow-y-auto divide-y">
+                  <div className="max-h-80 overflow-y-auto divide-y">
                     {notifications && notifications.length > 0 ? (
-                      notifications.slice(0, 10).map((n: any) => (
+                      notifications.map((n: any) => (
                         <div
                           key={n.id}
                           onClick={() => handleNotificationClick(n)}
-                          className={`p-3 text-xs flex items-start gap-3 cursor-pointer hover:bg-muted/50 transition-colors ${!n.isRead ? 'bg-primary/5 font-medium' : 'text-muted-foreground'}`}
+                          className={`p-3 text-xs flex items-start gap-2.5 cursor-pointer hover:bg-muted/60 transition-colors group ${!n.isRead ? 'bg-primary/5 font-medium' : 'text-muted-foreground'}`}
                         >
-                          <span className="text-base leading-none mt-0.5">
+                          <span className="text-base leading-none mt-0.5 flex-shrink-0">
                             {n.type === 'friend_request' ? '📩' : n.type === 'friend_online' ? '🟢' : '🔔'}
                           </span>
-                          <div className="flex-1 space-y-0.5">
-                            <p className="text-foreground leading-snug">{n.message}</p>
+                          <div className="flex-1 space-y-0.5 min-w-0">
+                            <p className="text-foreground leading-snug break-words">{n.message}</p>
                             <span className="text-[10px] text-muted-foreground block">
                               {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
-                          {!n.isRead && (
-                            <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-1" />
-                          )}
+                          <div className="flex items-center gap-0.5 flex-shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
+                            {!n.isRead && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-primary hover:bg-primary/10"
+                                title="Mark as read"
+                                onClick={(e) => handleMarkRead(e, n.id)}
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                              title="Delete notification"
+                              onClick={(e) => handleDeleteNotification(e, n.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </div>
                       ))
                     ) : (
