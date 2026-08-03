@@ -9,6 +9,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/context/AuthContext';
+import { useActiveGame } from '@/context/ActiveGameContext';
 import { Loader2, Flag, Handshake, Home, Trophy, Minus, ArrowUpDown, Send, MessageCircle } from 'lucide-react';
 import { Chess } from 'chess.js';
 
@@ -435,6 +436,27 @@ export default function Game() {
   });
   const resignGame = useResignGame();
   const offerDraw = useOfferDraw();
+  const { setIsGameActive, setOnLeaveCallback } = useActiveGame();
+
+  // Register active game leave protection when game is active
+  useEffect(() => {
+    if (game?.status === 'active') {
+      setIsGameActive(true);
+      setOnLeaveCallback(async () => {
+        try {
+          await resignGame.mutateAsync({ id: gameId });
+        } catch { /* ignore */ }
+      });
+    } else {
+      setIsGameActive(false);
+      setOnLeaveCallback(null);
+    }
+
+    return () => {
+      setIsGameActive(false);
+      setOnLeaveCallback(null);
+    };
+  }, [game?.status, gameId]);
 
   // ── SSE: real-time game updates with auto-reconnect ──────────────────────
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

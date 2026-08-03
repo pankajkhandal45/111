@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/context/AuthContext";
+import { ActiveGameProvider } from "@/context/ActiveGameContext";
 import { Layout } from "@/components/Layout";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Suspense, lazy, useEffect, useRef } from "react";
@@ -107,13 +108,15 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="system" storageKey="chesshub-theme">
         <AuthProvider>
-          <TooltipProvider>
-            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-              <BackendWatcher />
-              <Router />
-            </WouterRouter>
-            <Toaster />
-          </TooltipProvider>
+          <ActiveGameProvider>
+            <TooltipProvider>
+              <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+                <BackendWatcher />
+                <Router />
+              </WouterRouter>
+              <Toaster />
+            </TooltipProvider>
+          </ActiveGameProvider>
         </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
