@@ -13,18 +13,39 @@ import { useToast } from "@/hooks/use-toast";
 import { getBaseUrl } from "@workspace/api-client-react";
 import Home from "@/pages/Home";
 
-const Game = lazy(() => import("@/pages/Game"));
-const Login = lazy(() => import("@/pages/Login"));
-const Register = lazy(() => import("@/pages/Register"));
-const Play = lazy(() => import("@/pages/Play"));
-const Leaderboard = lazy(() => import("@/pages/Leaderboard"));
-const Profile = lazy(() => import("@/pages/Profile"));
-const Analysis = lazy(() => import("@/pages/Analysis"));
-const Puzzles = lazy(() => import("@/pages/Puzzles"));
-const Friends = lazy(() => import("@/pages/Friends"));
-const Admin = lazy(() => import("@/pages/Admin"));
-const Settings = lazy(() => import("@/pages/Settings"));
-const NotFound = lazy(() => import("@/pages/not-found"));
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+
+function lazyWithRetry<T extends React.ComponentType<any>>(
+  componentImport: () => Promise<{ default: T }>
+) {
+  return lazy(async () => {
+    const pageHasBeenReloaded = window.sessionStorage.getItem('chunk_reload_done');
+    try {
+      const component = await componentImport();
+      window.sessionStorage.removeItem('chunk_reload_done');
+      return component;
+    } catch (error) {
+      if (!pageHasBeenReloaded) {
+        window.sessionStorage.setItem('chunk_reload_done', 'true');
+        window.location.reload();
+      }
+      throw error;
+    }
+  });
+}
+
+const Game = lazyWithRetry(() => import("@/pages/Game"));
+const Login = lazyWithRetry(() => import("@/pages/Login"));
+const Register = lazyWithRetry(() => import("@/pages/Register"));
+const Play = lazyWithRetry(() => import("@/pages/Play"));
+const Leaderboard = lazyWithRetry(() => import("@/pages/Leaderboard"));
+const Profile = lazyWithRetry(() => import("@/pages/Profile"));
+const Analysis = lazyWithRetry(() => import("@/pages/Analysis"));
+const Puzzles = lazyWithRetry(() => import("@/pages/Puzzles"));
+const Friends = lazyWithRetry(() => import("@/pages/Friends"));
+const Admin = lazyWithRetry(() => import("@/pages/Admin"));
+const Settings = lazyWithRetry(() => import("@/pages/Settings"));
+const NotFound = lazyWithRetry(() => import("@/pages/not-found"));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-[60vh]">
@@ -109,13 +130,15 @@ function App() {
       <ThemeProvider defaultTheme="system" storageKey="chesshub-theme">
         <AuthProvider>
           <ActiveGameProvider>
-            <TooltipProvider>
-              <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-                <BackendWatcher />
-                <Router />
-              </WouterRouter>
-              <Toaster />
-            </TooltipProvider>
+            <ErrorBoundary>
+              <TooltipProvider>
+                <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+                  <BackendWatcher />
+                  <Router />
+                </WouterRouter>
+                <Toaster />
+              </TooltipProvider>
+            </ErrorBoundary>
           </ActiveGameProvider>
         </AuthProvider>
       </ThemeProvider>

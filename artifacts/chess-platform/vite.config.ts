@@ -19,17 +19,19 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['image.png'],
+      includeAssets: ['favicon.svg', 'image.png', 'opengraph.jpg'],
       workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
         navigateFallback: 'index.html',
-        navigateFallbackDenylist: [/^\/api\//],
+        navigateFallbackDenylist: [/^\/api\//, /onrender\.com/],
         runtimeCaching: [
           {
-            urlPattern: /^\/api\//,
+            urlPattern: /\/api\//,
             handler: 'NetworkOnly',
           },
           {
-            urlPattern: /^https:\/\/chesshub-kpl4\.onrender\.com\/api\//,
+            urlPattern: /^https:\/\/.*\.onrender\.com/,
             handler: 'NetworkOnly',
           },
         ],
@@ -38,7 +40,10 @@ export default defineConfig({
         name: 'ChessHub',
         short_name: 'ChessHub',
         description: 'Play Chess Online',
-        theme_color: '#ffffff',
+        theme_color: '#0f172a',
+        background_color: '#0f172a',
+        display: 'standalone',
+        orientation: 'portrait',
         icons: [
           {
             src: 'image.png',
