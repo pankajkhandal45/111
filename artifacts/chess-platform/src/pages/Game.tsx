@@ -837,7 +837,7 @@ export default function Game() {
         {/* Finished banner to re-open modal */}
         {game.status === 'finished' && !showGameOver && (
           <Button variant="outline" className="w-full" onClick={() => setShowGameOver(true)}>
-            <Trophy className="w-4 h-4 mr-2" /> Result dekhna
+            <Trophy className="w-4 h-4 mr-2" /> See Result
           </Button>
         )}
       </div>
