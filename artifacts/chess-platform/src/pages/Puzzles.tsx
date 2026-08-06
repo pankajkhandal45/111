@@ -20,7 +20,9 @@ export default function Puzzles() {
   const [failed, setFailed] = useState(false);
   const [startTime] = useState(Date.now());
   const [hintSquare, setHintSquare] = useState<string | null>(null);
+  const [hintTargetSquare, setHintTargetSquare] = useState<string | null>(null);
   const [hintText, setHintText] = useState<string | null>(null);
+  const [hintLevel, setHintLevel] = useState<number>(0);
 
   useEffect(() => {
     if (puzzle?.fen) {
@@ -30,7 +32,9 @@ export default function Puzzles() {
       setSolved(false);
       setFailed(false);
       setHintSquare(null);
+      setHintTargetSquare(null);
       setHintText(null);
+      setHintLevel(0);
     }
   }, [puzzle?.fen, chess]);
 
@@ -141,37 +145,61 @@ export default function Puzzles() {
 
     const legalMoves = chess.moves({ verbose: true });
     const cleanExpected = expectedMoveStr.trim().replace(/[+#]/g, '');
-    const matched = legalMoves.find(m =>
+
+    // Robust move finder: match by SAN, clean SAN, LAN, or UCI
+    let matched = legalMoves.find(m =>
       m.san === expectedMoveStr ||
       m.san.replace(/[+#]/g, '') === cleanExpected ||
       m.lan === expectedMoveStr ||
-      `${m.from}${m.to}` === cleanExpected
+      `${m.from}${m.to}` === cleanExpected ||
+      `${m.from}${m.to}${m.promotion || ''}` === cleanExpected
     );
 
+    const pieceNames: Record<string, string> = {
+      p: 'Pawn',
+      n: 'Knight',
+      b: 'Bishop',
+      r: 'Rook',
+      q: 'Queen',
+      k: 'King'
+    };
+
     if (matched) {
-      setHintSquare(matched.from);
-      const pieceNames: Record<string, string> = {
-        p: 'Pawn',
-        n: 'Knight',
-        b: 'Bishop',
-        r: 'Rook',
-        q: 'Queen',
-        k: 'King'
-      };
       const pName = pieceNames[matched.piece] || 'Piece';
-      const msg = `Move ${pName} on ${matched.from.toUpperCase()} (towards ${matched.to.toUpperCase()})`;
-      setHintText(msg);
-      toast({
-        title: "💡 Hint Available",
-        description: msg,
-        duration: 5000,
-      });
+      const fromSquareUpper = matched.from.toUpperCase();
+      const toSquareUpper = matched.to.toUpperCase();
+
+      if (hintLevel === 0) {
+        // Level 1 Hint: Highlight piece source square
+        setHintSquare(matched.from);
+        setHintTargetSquare(null);
+        setHintLevel(1);
+        const msg = `Hint (Level 1): Move your ${pName} on ${fromSquareUpper}`;
+        setHintText(msg);
+        toast({
+          title: "💡 Level 1 Hint",
+          description: `Highlighting ${pName} on ${fromSquareUpper}`,
+          duration: 5000,
+        });
+      } else {
+        // Level 2 Hint: Highlight both source & destination squares
+        setHintSquare(matched.from);
+        setHintTargetSquare(matched.to);
+        setHintLevel(2);
+        const msg = `Hint (Level 2): Move ${pName} from ${fromSquareUpper} to ${toSquareUpper} (${matched.san})`;
+        setHintText(msg);
+        toast({
+          title: "💡 Level 2 Full Hint",
+          description: `${fromSquareUpper} → ${toSquareUpper} (${matched.san})`,
+          duration: 6000,
+        });
+      }
     } else {
-      const msg = `Try move starting with: ${expectedMoveStr.substring(0, 2)}`;
-      setHintText(msg);
+      // Fallback hint for complex notation
+      setHintText(`Hint: Play move ${expectedMoveStr}`);
       toast({
-        title: "💡 Hint Available",
-        description: msg,
+        title: "💡 Hint",
+        description: `Play move ${expectedMoveStr}`,
         duration: 5000,
       });
     }
@@ -194,6 +222,7 @@ export default function Puzzles() {
             onMove={handleMove}
             disabled={solved || failed}
             hintSquare={hintSquare}
+            hintTargetSquare={hintTargetSquare}
           />
         </div>
         <div>
@@ -229,7 +258,8 @@ export default function Puzzles() {
                   onClick={handleGetHint} 
                   className="w-full font-semibold border-amber-400/40 hover:bg-amber-400/10 text-amber-500"
                 >
-                  <Lightbulb className="w-4 h-4 mr-2 text-amber-400 fill-amber-400/20" /> Get Hint
+                  <Lightbulb className="w-4 h-4 mr-2 text-amber-400 fill-amber-400/20" /> 
+                  {hintLevel === 0 ? "Get Hint (Level 1)" : "Get Full Move (Level 2)"}
                 </Button>
               )}
               
@@ -241,7 +271,9 @@ export default function Puzzles() {
                       onClick={() => {
                         setFailed(false);
                         setHintSquare(null);
+                        setHintTargetSquare(null);
                         setHintText(null);
+                        setHintLevel(0);
                         if (puzzle?.fen) {
                           chess.load(puzzle.fen);
                           setCurrentFen(chess.fen());
@@ -258,7 +290,9 @@ export default function Puzzles() {
                       setSolved(false);
                       setFailed(false);
                       setHintSquare(null);
+                      setHintTargetSquare(null);
                       setHintText(null);
+                      setHintLevel(0);
                       if (puzzle?.fen) {
                         chess.load(puzzle.fen);
                         setCurrentFen(chess.fen());
