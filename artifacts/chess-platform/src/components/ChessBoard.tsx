@@ -10,6 +10,7 @@ interface ChessBoardProps {
   lastMove?: { from: string; to: string };
   disabled?: boolean;
   rotateTopPieces?: boolean;
+  hintSquare?: string | null;
 }
 
 const PIECE_SYMBOLS: Record<Color, Record<PieceSymbol, string>> = {
@@ -22,7 +23,7 @@ const RANKS = ['8', '7', '6', '5', '4', '3', '2', '1'];
 
 const DEFAULT_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-export function ChessBoard({ fen, onMove, flipped = false, lastMove, disabled = false, rotateTopPieces = false }: ChessBoardProps) {
+export function ChessBoard({ fen, onMove, flipped = false, lastMove, disabled = false, rotateTopPieces = false, hintSquare = null }: ChessBoardProps) {
   const [chess, setChess] = useState(() => {
     const c = new Chess();
     if (fen && fen.trim()) {
@@ -136,6 +137,7 @@ export function ChessBoard({ fen, onMove, flipped = false, lastMove, disabled = 
             const isLastMove = lastMove?.from === square || lastMove?.to === square;
             const isValidMove = validMoves.some(m => m.to === square);
             const isKingInCheck = inCheck && square === kingSquare;
+            const isHint = hintSquare === square;
             
             return (
               <div 
@@ -146,6 +148,7 @@ export function ChessBoard({ fen, onMove, flipped = false, lastMove, disabled = 
                   isDark ? "bg-[#5D7E5D] text-[#ECEED5]" : "bg-[#ECEED5] text-[#5D7E5D]",
                   isLastMove && "after:absolute after:inset-0 after:bg-yellow-400/30",
                   isSelected && "after:absolute after:inset-0 after:bg-yellow-400/50",
+                  isHint && "after:absolute after:inset-0 after:bg-amber-400/60 after:animate-pulse ring-4 ring-amber-400 z-30",
                   isKingInCheck && "bg-red-500 after:absolute after:inset-0 after:bg-red-500/50 after:shadow-[inset_0_0_20px_rgba(255,0,0,0.8)]"
                 )}
               >
