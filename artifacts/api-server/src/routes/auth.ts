@@ -49,13 +49,24 @@ router.post("/auth/register", async (req, res) => {
 // POST /api/auth/login
 router.post("/auth/login", async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      res.status(400).json({ error: "Email and password are required" });
+    const { email, username, password } = req.body;
+    const identifier = (email || username || "").trim();
+
+    if (!identifier || !password) {
+      res.status(400).json({ error: "Email or username and password are required" });
       return;
     }
 
-    const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
+    const { sql } = await import("drizzle-orm");
+    const [user] = await db.select().from(usersTable)
+      .where(
+        or(
+          sql`lower(${usersTable.email}) = lower(${identifier})`,
+          sql`lower(${usersTable.username}) = lower(${identifier})`
+        )
+      )
+      .limit(1);
+
     if (!user || !user.passwordHash) {
       res.status(401).json({ error: "Invalid credentials" });
       return;
@@ -68,8 +79,14 @@ router.post("/auth/login", async (req, res) => {
     }
 
     await db.update(usersTable).set({ isOnline: true, lastSeen: new Date() }).where(eq(usersTable.id, user.id));
+
+    const [rating] = await db.select().from(ratingsTable).where(eq(ratingsTable.userId, user.id)).limit(1);
+    const ratings = rating
+      ? { bullet: rating.bullet, blitz: rating.blitz, rapid: rating.rapid, classical: rating.classical, puzzleRating: rating.puzzleRating }
+      : { bullet: 800, blitz: 800, rapid: 800, classical: 800, puzzleRating: 800 };
+
     const token = signToken(user.id);
-    res.json({ token, user: formatUser(user) });
+    res.json({ token, user: formatUser(user, ratings) });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Login failed" });

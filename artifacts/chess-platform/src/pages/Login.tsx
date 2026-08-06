@@ -64,11 +64,11 @@ export default function Login() {
         <form onSubmit={handleLogin}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">Email or Username</Label>
               <Input
                 id="email"
-                type="email"
-                placeholder="mikhail@tal.com"
+                type="text"
+                placeholder="username or email@example.com"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}

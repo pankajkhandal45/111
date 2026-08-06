@@ -51,8 +51,8 @@ function RatingCircle({
   subLabel: string;
 }) {
   const tier = getRankTier(rating);
-  // Map rating 600–2000 to 0–100%
-  const MIN = 600;
+  // Map rating 800–2000 to 0–100%
+  const MIN = 800;
   const MAX = 2000;
   const pct = Math.min(100, Math.max(0, ((rating - MIN) / (MAX - MIN)) * 100));
 
