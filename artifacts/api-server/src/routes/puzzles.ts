@@ -9,85 +9,85 @@ const router = Router();
 
 const DEFAULT_PUZZLES = [
   {
-    fen: "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4",
-    solution: ["Ng5", "d5", "exd5", "Na5"],
-    type: "tactical" as const,
-    difficulty: "beginner" as const,
-    title: "Fork the Queen",
-    description: "Find the winning tactic for White.",
+    title: "Back-Rank Checkmate",
+    description: "Exploit the weak back rank to deliver checkmate.",
+    type: "mate1" as const,
+    fen: "3r2k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1",
+    solution: ["Rxd8#"],
+    rating: 1000
   },
   {
-    fen: "r2qkb1r/ppp2ppp/2n1pn2/3p4/2PP4/2N2N2/PP2PPPP/R1BQKB1R w KQkq - 0 6",
-    solution: ["d5", "Ne5", "Nxe5", "dxe5"],
-    type: "tactical" as const,
-    difficulty: "beginner" as const,
-    title: "Central Breakthrough",
-    description: "Push for central control.",
+    title: "Queen & Rook Battery Checkmate",
+    description: "Infiltrate the enemy position with a queen sacrifice sequence.",
+    type: "mate2" as const,
+    fen: "r1b2rk1/pp3ppp/2p5/8/4Q3/8/PPP2PPP/R3R1K1 w - - 0 1",
+    solution: ["Qe8", "Rxe8", "Rxe8#"],
+    rating: 1200
   },
   {
-    fen: "5rk1/pp3ppp/2p5/8/3Pn3/2P1B3/PP3PPP/R4RK1 b - - 0 1",
-    solution: ["Nxf2", "Rxf2", "Rxf2"],
-    type: "tactical" as const,
-    difficulty: "intermediate" as const,
-    title: "Sacrifice for Material",
-    description: "Black wins material with accurate play.",
+    title: "Greek Gift Checkmate",
+    description: "Sacrifice the bishop on h7 to force checkmate with the queen.",
+    type: "mate2" as const,
+    fen: "r1bq1rk1/ppp2ppp/2n1p3/3p4/3P2Q1/2PBP3/PP3PPP/R3K2R w KQ - 0 1",
+    solution: ["Bxh7+", "Kxh7", "Qh5#"],
+    rating: 1400
   },
   {
-    fen: "r1b2rk1/pp2ppbp/2np1np1/q7/3NP3/2N1BP2/PPPQ2PP/R3KB1R w KQ - 0 9",
-    solution: ["Nb3", "Qb6", "Be2"],
-    type: "tactical" as const,
-    difficulty: "intermediate" as const,
-    title: "Queen Chase",
-    description: "Drive the queen away with tempo.",
+    title: "Smothered Checkmate",
+    description: "Deliver a classic 1-move smothered checkmate with your knight.",
+    type: "mate1" as const,
+    fen: "6rk/5ppp/8/4N3/8/8/8/6K1 w - - 0 1",
+    solution: ["Nxf7#"],
+    rating: 1300
   },
   {
-    fen: "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10",
-    solution: ["Nd5", "Nxd5", "exd5"],
+    title: "Greek Gift Attack",
+    description: "Sacrifice the bishop on h7 to launch a winning kingside attack.",
     type: "tactical" as const,
-    difficulty: "advanced" as const,
-    title: "Knight Outpost",
-    description: "Establish a dominant knight.",
+    fen: "r1bq1rk1/ppp2ppp/2n1p3/3p4/3P4/2PBPN2/PP3PPP/R2QK2R w KQ - 0 1",
+    solution: ["Bxh7+", "Kxh7", "Ng5+"],
+    rating: 1450
   },
   {
-    fen: "2kr3r/ppp1qppp/2n1b3/3p4/3P4/2N1BN2/PPP1QPPP/2KR3R w - - 0 1",
-    solution: ["Nb5", "Qb4", "Nd6+", "Kc7", "Nxf7"],
+    title: "Central Queen Pin & Simplification",
+    description: "Use the pin to force a favorable queen exchange.",
     type: "tactical" as const,
-    difficulty: "advanced" as const,
-    title: "Knight Invasion",
-    description: "White's knight launches a decisive attack.",
+    fen: "r1b1k2r/pppp1ppp/8/4q3/8/2N5/PPP2PPP/R2QKB1R w KQkq - 0 1",
+    solution: ["Qe2", "Qxe2+", "Nxe2"],
+    rating: 1100
   },
   {
+    title: "Rook Skewer",
+    description: "Skewer Black's king and rook along the c-file.",
+    type: "tactical" as const,
+    fen: "8/8/8/4k3/8/2R5/8/4K3 w - - 0 1",
+    solution: ["Rc5+", "Kd6", "Rc8"],
+    rating: 1350
+  },
+  {
+    title: "King & Pawn Endgame Escort",
+    description: "Use key squares to safely escort your pawn to promotion.",
+    type: "endgame" as const,
     fen: "4k3/8/4K3/4P3/8/8/8/8 w - - 0 1",
     solution: ["Kd6", "Kd8", "e6", "Ke8", "e7", "Kf7", "Kd7"],
-    type: "endgame" as const,
-    difficulty: "beginner" as const,
-    title: "King and Pawn Endgame",
-    description: "Escort the pawn to promotion.",
+    rating: 1000
   },
   {
-    fen: "8/8/1p6/pPp5/P1P5/8/5K1k/8 b - - 0 1",
-    solution: ["Kh3", "Kf3", "b5", "axb5", "a4"],
+    title: "Rook vs King Endgame Cutoff",
+    description: "Cut off the enemy king and force it to the edge of the board.",
     type: "endgame" as const,
-    difficulty: "intermediate" as const,
-    title: "Pawn Breakthrough",
-    description: "Find the winning pawn advance.",
-  },
-  {
     fen: "8/8/8/4k3/R7/8/8/4K3 w - - 0 1",
     solution: ["Ra5+", "Kd4", "Kd2", "Kc4", "Kc2", "Kb4", "Ra1"],
-    type: "endgame" as const,
-    difficulty: "intermediate" as const,
-    title: "Rook vs King",
-    description: "Force the king to the edge.",
+    rating: 1150
   },
   {
+    title: "Ruy Lopez Main Line Tactic",
+    description: "Develop with tempo and dominate the center.",
+    type: "tactical" as const,
     fen: "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3",
     solution: ["Bb5", "a6", "Ba4", "Nf6"],
-    type: "tactical" as const,
-    difficulty: "beginner" as const,
-    title: "Ruy Lopez",
-    description: "Play the classic Ruy Lopez opening.",
-  },
+    rating: 1050
+  }
 ];
 
 async function autoSeedPuzzles() {
