@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { friendRequestsTable, friendsTable, usersTable, ratingsTable, notificationsTable } from "@workspace/db";
-import { eq, and, or } from "drizzle-orm";
+import { eq, and, or, inArray } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../lib/auth";
 
 const router = Router();
@@ -16,19 +16,37 @@ router.get("/friends", requireAuth, async (req: AuthRequest, res) => {
     const friendIds = friendRows.map(f => f.userId === userId ? f.friendId : f.userId);
     const uniqueFriendIds = Array.from(new Set(friendIds));
 
-    const friends = await Promise.all(uniqueFriendIds.map(async (fid) => {
-      const [user] = await db.select().from(usersTable).where(eq(usersTable.id, fid)).limit(1);
-      const [rating] = await db.select().from(ratingsTable).where(eq(ratingsTable.userId, fid)).limit(1);
-      return {
-        id: user.id,
-        username: user.username,
-        avatar: user.avatar ?? null,
-        isOnline: user.isOnline,
-        lastSeen: user.lastSeen ?? null,
-        ratings: rating
-          ? { bullet: rating.bullet, blitz: rating.blitz, rapid: rating.rapid, classical: rating.classical }
-          : { bullet: 800, blitz: 800, rapid: 800, classical: 800 },
-      };
+    if (uniqueFriendIds.length === 0) {
+      res.json([]);
+      return;
+    }
+
+    const rows = await db.select({
+      id: usersTable.id,
+      username: usersTable.username,
+      avatar: usersTable.avatar,
+      isOnline: usersTable.isOnline,
+      lastSeen: usersTable.lastSeen,
+      bullet: ratingsTable.bullet,
+      blitz: ratingsTable.blitz,
+      rapid: ratingsTable.rapid,
+      classical: ratingsTable.classical,
+    }).from(usersTable)
+      .leftJoin(ratingsTable, eq(usersTable.id, ratingsTable.userId))
+      .where(inArray(usersTable.id, uniqueFriendIds));
+
+    const friends = rows.map(u => ({
+      id: u.id,
+      username: u.username,
+      avatar: u.avatar ?? null,
+      isOnline: u.isOnline,
+      lastSeen: u.lastSeen ?? null,
+      ratings: {
+        bullet: u.bullet ?? 800,
+        blitz: u.blitz ?? 800,
+        rapid: u.rapid ?? 800,
+        classical: u.classical ?? 800,
+      },
     }));
 
     res.json(friends);
@@ -42,18 +60,23 @@ router.get("/friends", requireAuth, async (req: AuthRequest, res) => {
 router.get("/friends/requests", requireAuth, async (req: AuthRequest, res) => {
   try {
     const userId = req.userId!;
-    const requests = await db.select().from(friendRequestsTable)
+    const requests = await db.select({
+      id: friendRequestsTable.id,
+      status: friendRequestsTable.status,
+      createdAt: friendRequestsTable.createdAt,
+      fromId: usersTable.id,
+      fromUsername: usersTable.username,
+      fromAvatar: usersTable.avatar,
+    }).from(friendRequestsTable)
+      .innerJoin(usersTable, eq(friendRequestsTable.fromUserId, usersTable.id))
       .where(and(eq(friendRequestsTable.toUserId, userId), eq(friendRequestsTable.status, "pending")));
 
-    const result = await Promise.all(requests.map(async (r) => {
-      const [from] = await db.select().from(usersTable).where(eq(usersTable.id, r.fromUserId)).limit(1);
-      return {
-        id: r.id,
-        fromUser: { id: from.id, username: from.username, avatar: from.avatar ?? null, rating: null },
-        toUser: null,
-        status: r.status,
-        createdAt: r.createdAt,
-      };
+    const result = requests.map(r => ({
+      id: r.id,
+      fromUser: { id: r.fromId, username: r.fromUsername, avatar: r.fromAvatar ?? null, rating: null },
+      toUser: null,
+      status: r.status,
+      createdAt: r.createdAt,
     }));
 
     res.json(result);
@@ -67,18 +90,23 @@ router.get("/friends/requests", requireAuth, async (req: AuthRequest, res) => {
 router.get("/friends/requests/sent", requireAuth, async (req: AuthRequest, res) => {
   try {
     const userId = req.userId!;
-    const requests = await db.select().from(friendRequestsTable)
+    const requests = await db.select({
+      id: friendRequestsTable.id,
+      status: friendRequestsTable.status,
+      createdAt: friendRequestsTable.createdAt,
+      toId: usersTable.id,
+      toUsername: usersTable.username,
+      toAvatar: usersTable.avatar,
+    }).from(friendRequestsTable)
+      .innerJoin(usersTable, eq(friendRequestsTable.toUserId, usersTable.id))
       .where(and(eq(friendRequestsTable.fromUserId, userId), eq(friendRequestsTable.status, "pending")));
 
-    const result = await Promise.all(requests.map(async (r) => {
-      const [to] = await db.select().from(usersTable).where(eq(usersTable.id, r.toUserId)).limit(1);
-      return {
-        id: r.id,
-        fromUser: null,
-        toUser: { id: to.id, username: to.username, avatar: to.avatar ?? null, rating: null },
-        status: r.status,
-        createdAt: r.createdAt,
-      };
+    const result = requests.map(r => ({
+      id: r.id,
+      fromUser: null,
+      toUser: { id: r.toId, username: r.toUsername, avatar: r.toAvatar ?? null, rating: null },
+      status: r.status,
+      createdAt: r.createdAt,
     }));
 
     res.json(result);

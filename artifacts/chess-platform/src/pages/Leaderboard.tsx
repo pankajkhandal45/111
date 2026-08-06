@@ -7,6 +7,8 @@ import { Link } from 'wouter';
 import { Trophy, Loader2 } from 'lucide-react';
 
 export default function Leaderboard() {
+  const [activeTab, setActiveTab] = React.useState<'bullet' | 'blitz' | 'rapid' | 'classical'>('rapid');
+
   return (
     <div className="max-w-5xl mx-auto py-8">
       <div className="flex items-center gap-3 mb-8">
@@ -14,7 +16,7 @@ export default function Leaderboard() {
         <h1 className="text-3xl font-bold">Global Leaderboard</h1>
       </div>
 
-      <Tabs defaultValue="rapid" className="w-full">
+      <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)} className="w-full">
         <TabsList className="w-full justify-start mb-6">
           <TabsTrigger value="bullet">Bullet</TabsTrigger>
           <TabsTrigger value="blitz">Blitz</TabsTrigger>
@@ -24,7 +26,7 @@ export default function Leaderboard() {
 
         {['bullet', 'blitz', 'rapid', 'classical'].map((timeControl) => (
           <TabsContent key={timeControl} value={timeControl}>
-            <LeaderboardTable timeControl={timeControl as any} />
+            {activeTab === timeControl && <LeaderboardTable timeControl={timeControl as any} />}
           </TabsContent>
         ))}
       </Tabs>

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { usersTable, ratingsTable, gamesTable } from "@workspace/db";
-import { eq, or, desc, and, like, ne } from "drizzle-orm";
+import { eq, or, desc, and, like, ne, inArray } from "drizzle-orm";
 
 const router = Router();
 
@@ -28,31 +28,60 @@ router.get("/leaderboard", async (req, res) => {
       .orderBy(desc(ratingsTable[ratingField]))
       .limit(limit);
 
-    // Get wins/losses/draws for each user
-    const rawEntries = await Promise.all(users.map(async (u) => {
-      const games = await db.select({
-        whitePlayerId: gamesTable.whitePlayerId,
-        blackPlayerId: gamesTable.blackPlayerId,
-        result: gamesTable.result,
-      }).from(gamesTable).where(
-        and(
-          or(eq(gamesTable.whitePlayerId, u.id), eq(gamesTable.blackPlayerId, u.id)),
-          eq(gamesTable.status, "finished"),
-          ne(gamesTable.mode, "local"),
-          like(gamesTable.timeControl, `${timeControl}%`)
-        )
-      ).limit(100);
+    if (users.length === 0) {
+      res.json([]);
+      return;
+    }
 
-      let wins = 0, losses = 0, draws = 0;
-      for (const g of games) {
-        const isWhite = g.whitePlayerId === u.id;
-        if (g.result === "draw") draws++;
-        else if ((g.result === "white" && isWhite) || (g.result === "black" && !isWhite)) wins++;
-        else losses++;
+    const userIds = users.map(u => u.id);
+
+    // Fetch all finished games for all users in a SINGLE bulk query
+    const finishedGames = await db.select({
+      whitePlayerId: gamesTable.whitePlayerId,
+      blackPlayerId: gamesTable.blackPlayerId,
+      result: gamesTable.result,
+    }).from(gamesTable).where(
+      and(
+        or(
+          inArray(gamesTable.whitePlayerId, userIds),
+          inArray(gamesTable.blackPlayerId, userIds)
+        ),
+        eq(gamesTable.status, "finished"),
+        ne(gamesTable.mode, "local"),
+        like(gamesTable.timeControl, `${timeControl}%`)
+      )
+    );
+
+    // Aggregate stats per user in memory
+    const userStats = new Map<number, { wins: number; losses: number; draws: number; totalGames: number }>();
+    for (const id of userIds) {
+      userStats.set(id, { wins: 0, losses: 0, draws: 0, totalGames: 0 });
+    }
+
+    for (const g of finishedGames) {
+      const whiteId = g.whitePlayerId;
+      const blackId = g.blackPlayerId;
+
+      if (whiteId && userStats.has(whiteId)) {
+        const stats = userStats.get(whiteId)!;
+        if (g.result === "draw") stats.draws++;
+        else if (g.result === "white") stats.wins++;
+        else stats.losses++;
+        stats.totalGames++;
       }
 
-      const totalGames = games.length;
-      const winRate = totalGames > 0 ? Math.round((wins / totalGames) * 1000) / 10 : 0;
+      if (blackId && userStats.has(blackId)) {
+        const stats = userStats.get(blackId)!;
+        if (g.result === "draw") stats.draws++;
+        else if (g.result === "black") stats.wins++;
+        else stats.losses++;
+        stats.totalGames++;
+      }
+    }
+
+    const rawEntries = users.map((u) => {
+      const stats = userStats.get(u.id) || { wins: 0, losses: 0, draws: 0, totalGames: 0 };
+      const winRate = stats.totalGames > 0 ? Math.round((stats.wins / stats.totalGames) * 1000) / 10 : 0;
 
       return {
         userId: u.id,
@@ -60,13 +89,13 @@ router.get("/leaderboard", async (req, res) => {
         avatar: u.avatar ?? null,
         country: u.country ?? null,
         rating: u[ratingField] as number,
-        wins,
-        losses,
-        draws,
-        totalGames,
+        wins: stats.wins,
+        losses: stats.losses,
+        draws: stats.draws,
+        totalGames: stats.totalGames,
         winRate,
       };
-    }));
+    });
 
     // Sort primarily by winRate desc, then wins desc, then rating desc
     rawEntries.sort((a, b) => {
