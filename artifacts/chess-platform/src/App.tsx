@@ -1,8 +1,8 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Redirect, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/context/AuthContext";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ActiveGameProvider } from "@/context/ActiveGameContext";
 import { Layout } from "@/components/Layout";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -14,6 +14,14 @@ import { getBaseUrl } from "@workspace/api-client-react";
 import Home from "@/pages/Home";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+
+function ProfileRedirect() {
+  const { user } = useAuth();
+  if (user?.username) {
+    return <Redirect to={`/profile/${user.username}`} />;
+  }
+  return <Redirect to="/login" />;
+}
 
 function lazyWithRetry<T extends React.ComponentType<any>>(
   componentImport: () => Promise<{ default: T }>
@@ -113,6 +121,7 @@ function Router() {
           <Route path="/analysis/:id" component={Analysis} />
           <Route path="/puzzles" component={Puzzles} />
           <Route path="/leaderboard" component={Leaderboard} />
+          <Route path="/profile" component={ProfileRedirect} />
           <Route path="/profile/:username" component={Profile} />
           <Route path="/friends" component={Friends} />
           <Route path="/admin" component={Admin} />

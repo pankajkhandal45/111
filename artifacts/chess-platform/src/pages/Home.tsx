@@ -381,7 +381,7 @@ export default function Home() {
             <Activity className="w-5 h-5 text-primary" /> Recent Matches
           </h2>
           <Button asChild variant="ghost" size="sm" className="text-xs font-semibold">
-            <Link href="/profile">View All Games <ArrowRight className="w-3 h-3 ml-1" /></Link>
+            <Link href={`/profile/${user.username}`}>View All Games <ArrowRight className="w-3 h-3 ml-1" /></Link>
           </Button>
         </div>
 

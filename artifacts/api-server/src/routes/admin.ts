@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { usersTable, ratingsTable, gamesTable, puzzlesTable, movesTable } from "@workspace/db";
-import { eq, desc, count, and, or, sql } from "drizzle-orm";
+import { eq, desc, count, and, or, sql, lt, gt } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../lib/auth";
 import type { Response, NextFunction } from "express";
 
@@ -20,9 +20,17 @@ async function requireAdmin(req: AuthRequest, res: Response, next: NextFunction)
 // GET /api/admin/stats
 router.get("/admin/stats", requireAdmin, async (req: AuthRequest, res) => {
   try {
+    // Auto-abandon stale active games whose last update was >5 minutes ago
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    await db.update(gamesTable)
+      .set({ status: "abandoned", resultReason: "abandoned", updatedAt: new Date() })
+      .where(and(eq(gamesTable.status, "active"), lt(gamesTable.updatedAt, fiveMinutesAgo)));
+
     const [totalUsers] = await db.select({ count: count() }).from(usersTable).where(eq(usersTable.isGuest, false));
     const [totalGames] = await db.select({ count: count() }).from(gamesTable);
-    const [activeGames] = await db.select({ count: count() }).from(gamesTable).where(eq(gamesTable.status, "active"));
+    const [activeGames] = await db.select({ count: count() }).from(gamesTable).where(
+      and(eq(gamesTable.status, "active"), gt(gamesTable.updatedAt, fiveMinutesAgo))
+    );
     const [finishedGames] = await db.select({ count: count() }).from(gamesTable).where(eq(gamesTable.status, "finished"));
     const [totalMoves] = await db.select({ count: count() }).from(movesTable);
     const [totalPuzzles] = await db.select({ count: count() }).from(puzzlesTable);

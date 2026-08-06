@@ -1,7 +1,7 @@
 import { Router, type Response } from "express";
 import { db } from "@workspace/db";
 import { gamesTable, movesTable, usersTable, ratingsTable } from "@workspace/db";
-import { eq, and, or, desc, ne, gt } from "drizzle-orm";
+import { eq, and, or, desc, ne, gt, lt } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../lib/auth";
 import { formatGameSummary } from "./users";
 import { updateGameRatings } from "../lib/rating";
@@ -246,8 +246,13 @@ router.post("/games/join", requireAuth, async (req: AuthRequest, res) => {
 // GET /api/games/active
 router.get("/games/active", requireAuth, async (req: AuthRequest, res) => {
   try {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    await db.update(gamesTable)
+      .set({ status: "abandoned", resultReason: "abandoned", updatedAt: new Date() })
+      .where(and(eq(gamesTable.status, "active"), lt(gamesTable.updatedAt, fiveMinutesAgo)));
+
     const activeGames = await db.query.gamesTable.findMany({
-      where: eq(gamesTable.status, "active"),
+      where: and(eq(gamesTable.status, "active"), gt(gamesTable.updatedAt, fiveMinutesAgo)),
       orderBy: [desc(gamesTable.createdAt)],
       limit: 20,
       with: {
