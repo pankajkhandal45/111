@@ -20,8 +20,19 @@ export default function Register() {
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
+
+    const cleanUsername = username.trim();
+    if (/\s/.test(username)) {
+      toast({
+        title: "Invalid Username",
+        description: "Username cannot contain spaces. Use letters, numbers, or _ -",
+        variant: "destructive"
+      });
+      return;
+    }
+
     registerMutation.mutate(
-      { data: { username, email, password } },
+      { data: { username: cleanUsername, email, password } },
       {
         onSuccess: (data) => {
           setToken(data.token, data.user);
@@ -30,7 +41,7 @@ export default function Register() {
         onError: (err: any) => {
           toast({
             title: "Registration failed",
-            description: err.message || "Could not create account",
+            description: err.response?.data?.error || err.message || "Could not create account",
             variant: "destructive"
           });
         }
@@ -55,8 +66,9 @@ export default function Register() {
                 placeholder="grandmaster"
                 required
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => setUsername(e.target.value.replace(/\s/g, ''))}
               />
+              <p className="text-[11px] text-muted-foreground">Spaces are not allowed in username</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>

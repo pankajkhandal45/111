@@ -16,6 +16,22 @@ router.post("/auth/register", async (req, res) => {
       return;
     }
 
+    const cleanUsername = username.trim();
+    if (/\s/.test(cleanUsername)) {
+      res.status(400).json({ error: "Username cannot contain spaces" });
+      return;
+    }
+
+    if (cleanUsername.length < 3 || cleanUsername.length > 20) {
+      res.status(400).json({ error: "Username must be between 3 and 20 characters" });
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9_-]+$/.test(cleanUsername)) {
+      res.status(400).json({ error: "Username can only contain letters, numbers, underscores, and hyphens" });
+      return;
+    }
+
     const existingEmail = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
     if (existingEmail.length > 0) {
       res.status(400).json({ error: "Email already registered" });

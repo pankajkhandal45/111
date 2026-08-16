@@ -134,16 +134,25 @@ router.patch("/users/me", requireAuth, async (req: AuthRequest, res) => {
     if (country !== undefined) updates.country = country;
     if (avatar !== undefined) updates.avatar = avatar;
     if (username !== undefined) {
-      if (username.length < 3 || username.length > 20) {
+      const cleanUsername = username.trim();
+      if (/\s/.test(cleanUsername)) {
+        res.status(400).json({ error: "Username cannot contain spaces" });
+        return;
+      }
+      if (cleanUsername.length < 3 || cleanUsername.length > 20) {
         res.status(400).json({ error: "Username must be 3-20 characters" });
         return;
       }
-      const existing = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.username, username)).limit(1);
+      if (!/^[a-zA-Z0-9_-]+$/.test(cleanUsername)) {
+        res.status(400).json({ error: "Username can only contain letters, numbers, underscores, and hyphens" });
+        return;
+      }
+      const existing = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.username, cleanUsername)).limit(1);
       if (existing.length > 0 && existing[0].id !== req.userId) {
         res.status(400).json({ error: "Username already taken" });
         return;
       }
-      updates.username = username;
+      updates.username = cleanUsername;
     }
     const [updated] = await db.update(usersTable).set(updates).where(eq(usersTable.id, req.userId!)).returning();
     res.json(formatUser(updated));
