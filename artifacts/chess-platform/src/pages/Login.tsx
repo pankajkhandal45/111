@@ -24,7 +24,7 @@ export default function Login() {
       { data: { email, password } },
       {
         onSuccess: (data) => {
-          setToken(data.token);
+          setToken(data.token, data.user);
           setLocation('/');
         },
         onError: (err: any) => {
@@ -41,7 +41,7 @@ export default function Login() {
   const handleGuestLogin = () => {
     guestLoginMutation.mutate(undefined, {
       onSuccess: (data) => {
-        setToken(data.token);
+        setToken(data.token, data.user);
         setLocation('/');
       },
       onError: (err: any) => {

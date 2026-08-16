@@ -10,8 +10,15 @@ const router = Router();
 // GET /api/users/:username
 router.get("/users/:username", async (req, res) => {
   try {
-    const { username } = req.params;
-    const [user] = await db.select().from(usersTable).where(eq(usersTable.username, username)).limit(1);
+    const rawParam = req.params.username;
+    if (!rawParam || rawParam === "undefined" || !rawParam.trim()) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    const username = decodeURIComponent(rawParam).trim();
+    const [user] = await db.select().from(usersTable)
+      .where(sql`lower(${usersTable.username}) = lower(${username})`)
+      .limit(1);
     if (!user) {
       res.status(404).json({ error: "User not found" });
       return;
@@ -53,8 +60,15 @@ router.get("/users/:username", async (req, res) => {
 // GET /api/users/:username/stats
 router.get("/users/:username/stats", async (req, res) => {
   try {
-    const { username } = req.params;
-    const [user] = await db.select().from(usersTable).where(eq(usersTable.username, username)).limit(1);
+    const rawParam = req.params.username;
+    if (!rawParam || rawParam === "undefined" || !rawParam.trim()) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    const username = decodeURIComponent(rawParam).trim();
+    const [user] = await db.select().from(usersTable)
+      .where(sql`lower(${usersTable.username}) = lower(${username})`)
+      .limit(1);
     if (!user) {
       res.status(404).json({ error: "User not found" });
       return;

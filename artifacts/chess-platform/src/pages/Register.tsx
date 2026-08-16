@@ -24,7 +24,7 @@ export default function Register() {
       { data: { username, email, password } },
       {
         onSuccess: (data) => {
-          setToken(data.token);
+          setToken(data.token, data.user);
           setLocation('/');
         },
         onError: (err: any) => {

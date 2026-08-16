@@ -16,7 +16,10 @@ import Home from "@/pages/Home";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 function ProfileRedirect() {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
+  if (isLoading) {
+    return <PageLoader />;
+  }
   if (user?.username) {
     return <Redirect to={`/profile/${user.username}`} />;
   }

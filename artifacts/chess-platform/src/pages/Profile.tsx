@@ -1,5 +1,5 @@
 import React from 'react';
-import { useGetUserProfile, useGetUserStats } from '@workspace/api-client-react';
+import { useGetUserProfile, useGetUserStats, getGetUserProfileQueryKey, getGetUserStatsQueryKey } from '@workspace/api-client-react';
 import { useParams, Link } from 'wouter';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,15 +35,35 @@ function getRankTier(rating: number) {
 }
 
 export default function Profile() {
-  const { username } = useParams<{ username: string }>();
-  const { user: currentUser } = useAuth();
+  const { username: paramUsername } = useParams<{ username: string }>();
+  const { user: currentUser, isLoading: isAuthLoading } = useAuth();
   
-  const { data: profile, isLoading: isProfileLoading } = useGetUserProfile(username);
-  const { data: stats, isLoading: isStatsLoading } = useGetUserStats(username);
+  // Fall back to currentUser's username if paramUsername is missing or 'undefined'
+  const targetUsername = (!paramUsername || paramUsername === 'undefined') 
+    ? currentUser?.username 
+    : paramUsername;
 
-  const isMe = currentUser?.username === username;
+  const validUsername = targetUsername && targetUsername !== 'undefined' ? targetUsername : '';
 
-  if (isProfileLoading || isStatsLoading) {
+  const { data: profile, isLoading: isProfileLoading } = useGetUserProfile(validUsername, {
+    query: {
+      queryKey: getGetUserProfileQueryKey(validUsername),
+      enabled: !!validUsername,
+      staleTime: 30_000,
+    }
+  });
+
+  const { data: stats, isLoading: isStatsLoading } = useGetUserStats(validUsername, {
+    query: {
+      queryKey: getGetUserStatsQueryKey(validUsername),
+      enabled: !!validUsername,
+      staleTime: 30_000,
+    }
+  });
+
+  const isMe = !!currentUser && !!validUsername && currentUser.username.toLowerCase() === validUsername.toLowerCase();
+
+  if (isAuthLoading || (validUsername && (isProfileLoading || isStatsLoading))) {
     return (
       <div className="max-w-5xl mx-auto py-12 px-4 space-y-6 animate-pulse">
         <div className="h-48 bg-muted/40 rounded-3xl" />
@@ -56,11 +76,18 @@ export default function Profile() {
 
   if (!profile) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
+      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4 text-center px-4">
         <ShieldAlert className="w-16 h-16 text-muted-foreground/50" />
         <h1 className="text-2xl font-bold">User Not Found</h1>
-        <p className="text-muted-foreground">The player @{username} does not exist or has been removed.</p>
-        <Button asChild><Link href="/">Back to Home</Link></Button>
+        <p className="text-muted-foreground max-w-md">
+          {validUsername ? `The player @${validUsername} does not exist or has been removed.` : "No user specified. Please log in or search for a player."}
+        </p>
+        <div className="flex items-center gap-3">
+          <Button asChild><Link href="/">Back to Home</Link></Button>
+          {currentUser && (
+            <Button variant="outline" asChild><Link href={`/profile/${currentUser.username}`}>My Profile</Link></Button>
+          )}
+        </div>
       </div>
     );
   }

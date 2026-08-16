@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  setToken: (token: string | null) => void;
+  setToken: (token: string | null, newUser?: User | null) => void;
   logout: () => void;
   isLoading: boolean;
 }
@@ -24,12 +24,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
   const queryClient = useQueryClient();
 
-  const setToken = (newToken: string | null) => {
+  const setToken = (newToken: string | null, newUser?: User | null) => {
     if (newToken) {
       localStorage.setItem("chess_token", newToken);
+      if (newUser) {
+        setCachedUser(newUser);
+        try {
+          localStorage.setItem("chess_cached_user", JSON.stringify(newUser));
+        } catch { /* ignore quota errors */ }
+        queryClient.setQueryData(['/api/auth/me'], newUser);
+      }
     } else {
       localStorage.removeItem("chess_token");
       localStorage.removeItem("chess_cached_user");
+      localStorage.removeItem("chess_cached_dashboard");
       setCachedUser(null);
     }
     setTokenState(newToken);
@@ -38,6 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     localStorage.removeItem("chess_token");
     localStorage.removeItem("chess_cached_user");
+    localStorage.removeItem("chess_cached_dashboard");
     setTokenState(null);
     setCachedUser(null);
     queryClient.clear();
