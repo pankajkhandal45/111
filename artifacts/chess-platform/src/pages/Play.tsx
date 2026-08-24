@@ -1,63 +1,118 @@
 import React, { useState, useEffect } from 'react';
-import { useCreateGame, getBaseUrl, getGetGameQueryKey } from '@workspace/api-client-react';
+import { useCreateGame, getBaseUrl, getGetGameQueryKey, useGetDashboard } from '@workspace/api-client-react';
 import { useLocation, useSearch } from 'wouter';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Loader2, Globe, Cpu, Users, Lock, Copy, Check, Link2, UserPlus } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { 
+  Loader2, 
+  Globe, 
+  Users, 
+  Lock, 
+  Copy, 
+  Check, 
+  Link2, 
+  UserPlus, 
+  Flame, 
+  Zap, 
+  Clock, 
+  Trophy, 
+  Bot, 
+  Play as PlayIcon, 
+  ArrowRight,
+  CheckCircle2,
+  Swords
+} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'framer-motion';
 
-const TIME_CONTROLS = {
-  bullet: [
-    { id: 'bullet1', name: '1 min' },
-    { id: 'bullet2', name: '2 min' }
+interface TimeControlItem {
+  id: string;
+  name: string;
+  tag: string;
+  desc: string;
+  icon: any;
+  color: string;
+}
+
+const TIME_CONTROLS: Record<string, TimeControlItem[]> = {
+  rapid: [
+    { id: 'rapid10', name: '10 min', tag: 'Rapid', desc: '10 min per player', icon: Clock, color: 'text-emerald-500' },
+    { id: 'rapid15', name: '15 min', tag: 'Rapid', desc: '15 min per player', icon: Clock, color: 'text-emerald-500' },
+    { id: 'rapid30', name: '30 min', tag: 'Rapid', desc: '30 min per player', icon: Clock, color: 'text-emerald-500' }
   ],
   blitz: [
-    { id: 'blitz3', name: '3 min' },
-    { id: 'blitz5', name: '5 min' }
+    { id: 'blitz3', name: '3 min', tag: 'Blitz', desc: '3 min per player', icon: Zap, color: 'text-amber-500' },
+    { id: 'blitz5', name: '5 min', tag: 'Blitz', desc: '5 min per player', icon: Zap, color: 'text-amber-500' }
   ],
-  rapid: [
-    { id: 'rapid10', name: '10 min' },
-    { id: 'rapid15', name: '15 min' },
-    { id: 'rapid30', name: '30 min' }
+  bullet: [
+    { id: 'bullet1', name: '1 min', tag: 'Bullet', desc: '1 min per player', icon: Flame, color: 'text-rose-500' },
+    { id: 'bullet2', name: '2 min', tag: 'Bullet', desc: '2 min per player', icon: Flame, color: 'text-rose-500' }
   ],
   classical: [
-    { id: 'classical60', name: '60 min' }
+    { id: 'classical60', name: '60 min', tag: 'Classical', desc: '60 min per player', icon: Trophy, color: 'text-blue-500' }
   ]
 };
 
-const BOT_LEVELS = [
-  { id: 'beginner', name: 'Beginner' },
-  { id: 'easy', name: 'Easy' },
-  { id: 'intermediate', name: 'Intermediate' },
-  { id: 'advanced', name: 'Advanced' },
-  { id: 'expert', name: 'Expert' },
-  { id: 'master', name: 'Master' },
-  { id: 'grandmaster', name: 'Grandmaster' }
+const BOT_ROSTER = [
+  { id: 'beginner', name: 'Martin', title: 'Beginner', elo: 400, avatar: '🌱', color: 'text-emerald-500' },
+  { id: 'easy', name: 'Sven', title: 'Easy', elo: 800, avatar: '♟️', color: 'text-green-500' },
+  { id: 'intermediate', name: 'Isabel', title: 'Intermediate', elo: 1200, avatar: '🛡️', color: 'text-blue-500' },
+  { id: 'advanced', name: 'Wally', title: 'Advanced', elo: 1600, avatar: '⚔️', color: 'text-indigo-500' },
+  { id: 'expert', name: 'Nora', title: 'Expert', elo: 2000, avatar: '🔮', color: 'text-purple-500' },
+  { id: 'master', name: 'Magnus Bot', title: 'Master', elo: 2400, avatar: '👑', color: 'text-rose-500' },
+  { id: 'grandmaster', name: 'Stockfish Titan', title: 'GM', elo: 2800, avatar: '🤖', color: 'text-amber-500' }
 ];
 
 export default function Play() {
   const [, setLocation] = useLocation();
   const createGame = useCreateGame();
-  const { token } = useAuth();
+  const { user, token } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: dashboard } = useGetDashboard({
+    query: {
+      queryKey: ['/api/dashboard'],
+      enabled: !!user,
+    }
+  });
+
+  const ratings: any = dashboard?.ratings || (user as any)?.ratings || {
+    bullet: 800,
+    blitz: 800,
+    rapid: 800,
+    classical: 800
+  };
 
   const searchString = useSearch();
   const params = new URLSearchParams(searchString);
   const joinParam = params.get('join');
+  const modeParam = params.get('mode');
 
-  const [mode, setMode] = useState<'online' | 'bot' | 'local' | 'private'>(joinParam ? 'private' : 'online');
+  const [mode, setMode] = useState<'online' | 'bot' | 'local' | 'private'>('online');
   const [timeControl, setTimeControl] = useState('rapid10');
   const [botLevel, setBotLevel] = useState('intermediate');
 
-  // Private match states
+  useEffect(() => {
+    if (joinParam) {
+      setMode('private');
+      setPrivateTab('join');
+      setJoinCode(joinParam.toUpperCase());
+    } else if (modeParam && ['online', 'bot', 'local', 'private'].includes(modeParam)) {
+      setMode(modeParam as any);
+    }
+  }, [joinParam, modeParam]);
+
   const [privateTab, setPrivateTab] = useState<'create' | 'join'>(joinParam ? 'join' : 'create');
   const [createdGame, setCreatedGame] = useState<{ id: number; roomCode: string } | null>(null);
   const [joinCode, setJoinCode] = useState(joinParam || '');
-  const [copied, setCopied] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   const joinGameMutation = useMutation({
     mutationFn: async (code: string) => {
@@ -71,7 +126,7 @@ export default function Play() {
         body: JSON.stringify({ roomCode: code }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to join');
+      if (!res.ok) throw new Error(data.error || 'Failed to join game');
       return data;
     },
     onSuccess: (data) => {
@@ -81,8 +136,6 @@ export default function Play() {
       toast({ title: 'Failed to join game', description: err.message, variant: 'destructive' });
     },
   });
-
-  const queryClient = useQueryClient();
 
   const handleCreateGame = () => {
     createGame.mutate(
@@ -112,8 +165,8 @@ export default function Play() {
   const handleCopyCode = () => {
     if (!createdGame) return;
     navigator.clipboard.writeText(createdGame.roomCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
     toast({ title: 'Room code copied!' });
   };
 
@@ -121,7 +174,9 @@ export default function Play() {
     if (!createdGame) return;
     const link = `${window.location.origin}/play?join=${createdGame.roomCode}`;
     navigator.clipboard.writeText(link);
-    toast({ title: 'Invite link copied! Share it with your friend.' });
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+    toast({ title: 'Invite link copied!' });
   };
 
   const handleJoinGame = () => {
@@ -129,237 +184,348 @@ export default function Play() {
     joinGameMutation.mutate(joinCode.trim().toUpperCase());
   };
 
-  // If a private game was just created, show the lobby/waiting screen
+  const getSelectedTimeControlObj = () => {
+    for (const group of Object.values(TIME_CONTROLS)) {
+      const match = group.find(item => item.id === timeControl);
+      if (match) return match;
+    }
+    return TIME_CONTROLS.rapid[0];
+  };
+
+  const selectedTcObj = getSelectedTimeControlObj();
+  const selectedBotObj = BOT_ROSTER.find(b => b.id === botLevel) || BOT_ROSTER[2];
+
+  const getRatingForCategory = (category: string) => {
+    if (category === 'bullet') return ratings?.bullet || 800;
+    if (category === 'blitz') return ratings?.blitz || 800;
+    if (category === 'rapid') return ratings?.rapid || 800;
+    if (category === 'classical') return ratings?.classical || 800;
+    return 800;
+  };
+
+  // Screen when private game is created
   if (createdGame) {
     return (
-      <div className="max-w-lg mx-auto py-16 flex flex-col items-center gap-8">
+      <div className="max-w-md mx-auto py-12 px-4 space-y-6">
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold">Private Match Created!</h1>
-          <p className="text-muted-foreground">Share the room code or link with your friend to start the game.</p>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-500 text-xs font-semibold">
+            <CheckCircle2 className="w-3.5 h-3.5" /> Room Ready
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight">Private Room Created</h1>
+          <p className="text-xs text-muted-foreground">Share the room code or link with your opponent.</p>
         </div>
 
-        <Card className="w-full">
-          <CardContent className="pt-6 space-y-6">
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground mb-2">Room Code</p>
-              <div className="flex items-center justify-center gap-3">
-                <span className="text-5xl font-mono font-bold tracking-widest text-primary">
-                  {createdGame.roomCode}
-                </span>
-                <Button size="icon" variant="outline" onClick={handleCopyCode}>
-                  {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-                </Button>
-              </div>
+        <Card className="border-border/60 shadow-md">
+          <CardContent className="p-6 text-center space-y-6">
+            <div>
+              <span className="text-xs uppercase font-medium text-muted-foreground block mb-2">Room Code</span>
+              <span className="text-4xl font-mono font-bold tracking-[0.2em] text-primary">
+                {createdGame.roomCode}
+              </span>
             </div>
 
-            <div className="border-t pt-4 space-y-3">
-              <Button variant="outline" className="w-full" onClick={handleCopyLink}>
-                <Link2 className="mr-2 h-4 w-4" /> Copy Invite Link
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" size="sm" onClick={handleCopyCode} className="h-10 text-xs font-medium">
+                {copiedCode ? <Check className="mr-1.5 h-3.5 w-3.5 text-emerald-500" /> : <Copy className="mr-1.5 h-3.5 w-3.5" />}
+                {copiedCode ? 'Copied' : 'Copy Code'}
               </Button>
-              <Button className="w-full" onClick={() => setLocation(`/game/${createdGame.id}`)}>
-                Enter Game Room & Wait for Friend
+              <Button variant="outline" size="sm" onClick={handleCopyLink} className="h-10 text-xs font-medium">
+                {copiedLink ? <Check className="mr-1.5 h-3.5 w-3.5 text-emerald-500" /> : <Link2 className="mr-1.5 h-3.5 w-3.5" />}
+                {copiedLink ? 'Copied' : 'Copy Link'}
               </Button>
             </div>
+
+            <Button 
+              size="lg" 
+              className="w-full h-11 text-sm font-bold rounded-xl" 
+              onClick={() => setLocation(`/game/${createdGame.id}`)}
+            >
+              Enter Game Room <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
           </CardContent>
         </Card>
 
-        <Button variant="ghost" onClick={() => setCreatedGame(null)}>← Back</Button>
+        <div className="text-center">
+          <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => setCreatedGame(null)}>
+            ← Back
+          </Button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-8">Play Chess</h1>
+    <div className="max-w-3xl mx-auto py-8 px-4 space-y-6">
+      {/* ── Minimalist Clean Header ── */}
+      <div className="text-center space-y-1">
+        <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Play Chess</h1>
+        <p className="text-xs md:text-sm text-muted-foreground">Select game mode and time control to get started</p>
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="md:col-span-1 flex flex-col gap-2">
-          <Button
-            variant={mode === 'online' ? 'default' : 'ghost'}
-            className="justify-start w-full"
-            onClick={() => setMode('online')}
-          >
-            <Globe className="mr-2 h-4 w-4" /> Play Online
-          </Button>
-          <Button
-            variant={mode === 'bot' ? 'default' : 'ghost'}
-            className="justify-start w-full"
-            onClick={() => setMode('bot')}
-          >
-            <Cpu className="mr-2 h-4 w-4" /> Play Computer
-          </Button>
-          <Button
-            variant={mode === 'local' ? 'default' : 'ghost'}
-            className="justify-start w-full"
-            onClick={() => setMode('local')}
-          >
-            <Users className="mr-2 h-4 w-4" /> Play Local
-          </Button>
-          <Button
-            variant={mode === 'private' ? 'default' : 'ghost'}
-            className="justify-start w-full"
-            onClick={() => setMode('private')}
-          >
-            <Lock className="mr-2 h-4 w-4" /> Private Match
-          </Button>
-        </div>
+      {/* ── Sleek Segmented Mode Bar ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-muted/40 p-1.5 rounded-2xl border border-border/50">
+        <button
+          type="button"
+          onClick={() => setMode('online')}
+          className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
+            mode === 'online'
+              ? 'bg-card text-foreground shadow border border-border/40'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Globe className="w-4 h-4 text-emerald-500" />
+          <span>Online</span>
+        </button>
 
-        <div className="md:col-span-3">
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                {mode === 'online' && 'Play against someone of your skill level'}
-                {mode === 'bot' && 'Challenge the computer'}
-                {mode === 'local' && 'Play with a friend on the same screen'}
-                {mode === 'private' && 'Private Match with a Friend'}
-              </CardTitle>
-              <CardDescription>
-                {mode === 'private'
-                  ? 'Create a game and share the code, or join with a code'
-                  : 'Select a time control to begin'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+        <button
+          type="button"
+          onClick={() => setMode('bot')}
+          className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
+            mode === 'bot'
+              ? 'bg-card text-foreground shadow border border-border/40'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Bot className="w-4 h-4 text-blue-500" />
+          <span>vs Computer</span>
+        </button>
 
-              {mode === 'private' ? (
-                <div className="space-y-4">
-                  {/* Create / Join Tabs */}
-                  <div className="flex gap-2 p-1 bg-muted rounded-lg">
-                    <button
-                      onClick={() => setPrivateTab('create')}
-                      className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${privateTab === 'create' ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                    >
-                      Create Game
-                    </button>
-                    <button
-                      onClick={() => setPrivateTab('join')}
-                      className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${privateTab === 'join' ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                    >
-                      Join with Code
-                    </button>
+        <button
+          type="button"
+          onClick={() => setMode('local')}
+          className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
+            mode === 'local'
+              ? 'bg-card text-foreground shadow border border-border/40'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Users className="w-4 h-4 text-purple-500" />
+          <span>Pass &amp; Play</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMode('private')}
+          className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
+            mode === 'private'
+              ? 'bg-card text-foreground shadow border border-border/40'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Lock className="w-4 h-4 text-amber-500" />
+          <span>Private Match</span>
+        </button>
+      </div>
+
+      {/* ── Main Clean Container ── */}
+      <Card className="border-border/50 shadow-sm rounded-2xl">
+        <CardContent className="p-6 space-y-6">
+
+          {/* PRIVATE MATCH setup */}
+          {mode === 'private' ? (
+            <div className="space-y-6">
+              <div className="flex justify-center gap-2 border-b border-border/40 pb-4">
+                <Button
+                  variant={privateTab === 'create' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setPrivateTab('create')}
+                  className="rounded-lg text-xs font-bold"
+                >
+                  Create Room
+                </Button>
+                <Button
+                  variant={privateTab === 'join' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setPrivateTab('join')}
+                  className="rounded-lg text-xs font-bold"
+                >
+                  Join Room
+                </Button>
+              </div>
+
+              {privateTab === 'create' ? (
+                <div className="space-y-6">
+                  <div className="space-y-3">
+                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">Time Control</span>
+                    <Tabs defaultValue="rapid" className="w-full">
+                      <TabsList className="w-full justify-start bg-muted/40 p-1 rounded-xl">
+                        <TabsTrigger value="rapid" className="rounded-lg text-xs font-bold">Rapid</TabsTrigger>
+                        <TabsTrigger value="blitz" className="rounded-lg text-xs font-bold">Blitz</TabsTrigger>
+                        <TabsTrigger value="bullet" className="rounded-lg text-xs font-bold">Bullet</TabsTrigger>
+                        <TabsTrigger value="classical" className="rounded-lg text-xs font-bold">Classical</TabsTrigger>
+                      </TabsList>
+
+                      {Object.entries(TIME_CONTROLS).map(([category, controls]) => (
+                        <TabsContent key={category} value={category} className="mt-3">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            {controls.map((control) => {
+                              const isSelected = timeControl === control.id;
+                              return (
+                                <button
+                                  key={control.id}
+                                  type="button"
+                                  onClick={() => setTimeControl(control.id)}
+                                  className={`p-3.5 rounded-xl border text-center transition-all cursor-pointer ${
+                                    isSelected
+                                      ? 'border-primary bg-primary/10 font-bold shadow-sm'
+                                      : 'border-border/50 bg-muted/20 hover:bg-muted/40'
+                                  }`}
+                                >
+                                  <div className="text-base font-bold">{control.name}</div>
+                                  <div className="text-[11px] text-muted-foreground">{control.tag}</div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </TabsContent>
+                      ))}
+                    </Tabs>
                   </div>
 
-                  {privateTab === 'create' ? (
-                    <div className="space-y-6">
-                      <p className="text-sm text-muted-foreground">
-                        Select a time control, create the game and share the room code with your friend. They can join from any device.
-                      </p>
-                      <Tabs defaultValue="rapid" className="w-full">
-                        <TabsList className="w-full justify-start">
-                          <TabsTrigger value="bullet">Bullet</TabsTrigger>
-                          <TabsTrigger value="blitz">Blitz</TabsTrigger>
-                          <TabsTrigger value="rapid">Rapid</TabsTrigger>
-                          <TabsTrigger value="classical">Classical</TabsTrigger>
-                        </TabsList>
-                        {Object.entries(TIME_CONTROLS).map(([category, controls]) => (
-                          <TabsContent key={category} value={category} className="mt-4">
-                            <div className="flex flex-wrap gap-4">
-                              {controls.map(control => (
-                                <Button
-                                  key={control.id}
-                                  variant={timeControl === control.id ? 'default' : 'outline'}
-                                  className="h-24 w-32 flex flex-col gap-2 text-lg"
-                                  onClick={() => setTimeControl(control.id)}
-                                >
-                                  <span>{control.name}</span>
-                                </Button>
-                              ))}
-                            </div>
-                          </TabsContent>
-                        ))}
-                      </Tabs>
-                      <div className="pt-2 border-t flex justify-end">
-                        <Button size="lg" className="w-full md:w-auto px-12 text-lg" onClick={handleCreateGame} disabled={createGame.isPending}>
-                          {createGame.isPending ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Lock className="mr-2 h-5 w-5" />}
-                          Create Private Game
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-6">
-                      <p className="text-sm text-muted-foreground">
-                        Enter the 6-letter room code your friend shared with you to join their game.
-                      </p>
-                      <div className="space-y-3">
-                        <Input
-                          placeholder="Enter room code (e.g. AB12CD)"
-                          value={joinCode}
-                          onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                          className="text-center text-2xl font-mono tracking-widest h-16"
-                          maxLength={6}
-                          onKeyDown={(e) => e.key === 'Enter' && handleJoinGame()}
-                        />
-                        <Button
-                          size="lg"
-                          className="w-full text-lg"
-                          onClick={handleJoinGame}
-                          disabled={joinCode.length !== 6 || joinGameMutation.isPending}
-                        >
-                          {joinGameMutation.isPending ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <UserPlus className="mr-2 h-5 w-5" />}
-                          Join Game
-                        </Button>
-                      </div>
-                    </div>
-                  )}
+                  <Button 
+                    size="lg" 
+                    className="w-full h-11 text-sm font-bold rounded-xl"
+                    onClick={handleCreateGame} 
+                    disabled={createGame.isPending}
+                  >
+                    {createGame.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lock className="mr-2 h-4 w-4" />}
+                    Create Private Room
+                  </Button>
                 </div>
               ) : (
-                <>
-                  {mode === 'bot' && (
-                    <div className="space-y-2">
-                      <h3 className="font-semibold">Bot Level</h3>
-                      <div className="flex flex-wrap gap-2">
-                        {BOT_LEVELS.map(level => (
-                          <Button
-                            key={level.id}
-                            variant={botLevel === level.id ? 'default' : 'outline'}
-                            onClick={() => setBotLevel(level.id)}
-                          >
-                            {level.name}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <Tabs defaultValue="rapid" className="w-full">
-                    <TabsList className="w-full justify-start">
-                      <TabsTrigger value="bullet">Bullet</TabsTrigger>
-                      <TabsTrigger value="blitz">Blitz</TabsTrigger>
-                      <TabsTrigger value="rapid">Rapid</TabsTrigger>
-                      <TabsTrigger value="classical">Classical</TabsTrigger>
-                    </TabsList>
-
-                    {Object.entries(TIME_CONTROLS).map(([category, controls]) => (
-                      <TabsContent key={category} value={category} className="mt-4">
-                        <div className="flex flex-wrap gap-4">
-                          {controls.map(control => (
-                            <Button
-                              key={control.id}
-                              variant={timeControl === control.id ? 'default' : 'outline'}
-                              className="h-24 w-32 flex flex-col gap-2 text-lg"
-                              onClick={() => setTimeControl(control.id)}
-                            >
-                              <span>{control.name}</span>
-                            </Button>
-                          ))}
-                        </div>
-                      </TabsContent>
-                    ))}
-                  </Tabs>
-
-                  <div className="pt-6 border-t flex justify-end">
-                    <Button size="lg" className="w-full md:w-auto px-12 text-lg" onClick={handleCreateGame} disabled={createGame.isPending}>
-                      {createGame.isPending ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-                      Play
-                    </Button>
-                  </div>
-                </>
+                <div className="max-w-sm mx-auto space-y-4 py-2 text-center">
+                  <p className="text-xs text-muted-foreground">Enter 6-letter room code</p>
+                  <Input
+                    placeholder="ROOM CODE"
+                    value={joinCode}
+                    onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                    className="text-center text-2xl font-mono tracking-widest h-14 font-bold rounded-xl uppercase"
+                    maxLength={6}
+                    onKeyDown={(e) => e.key === 'Enter' && handleJoinGame()}
+                  />
+                  <Button
+                    size="lg"
+                    className="w-full h-11 text-sm font-bold rounded-xl"
+                    onClick={handleJoinGame}
+                    disabled={joinCode.length !== 6 || joinGameMutation.isPending}
+                  >
+                    {joinGameMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
+                    Join Game
+                  </Button>
+                </div>
               )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+            </div>
+          ) : (
+            /* ONLINE / BOT / LOCAL MODES */
+            <div className="space-y-6">
+
+              {/* BOT LEVEL SELECTOR */}
+              {mode === 'bot' && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-muted-foreground uppercase tracking-wider">Select Bot</span>
+                    <span className="font-bold text-foreground">{selectedBotObj.name} ({selectedBotObj.elo} Elo)</span>
+                  </div>
+
+                  <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                    {BOT_ROSTER.map((bot) => {
+                      const isSelected = botLevel === bot.id;
+                      return (
+                        <button
+                          key={bot.id}
+                          type="button"
+                          onClick={() => setBotLevel(bot.id)}
+                          className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                            isSelected
+                              ? 'border-blue-500 bg-blue-500/10 font-bold shadow-sm'
+                              : 'border-border/50 bg-muted/20 hover:bg-muted/40'
+                          }`}
+                        >
+                          <span className="text-xl">{bot.avatar}</span>
+                          <span className="text-[11px] font-bold truncate w-full">{bot.name}</span>
+                          <span className="text-[9px] text-muted-foreground font-mono">{bot.elo}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* TIME CONTROL SELECTOR */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-muted-foreground uppercase tracking-wider">Select Time Control</span>
+                  {user && (
+                    <span className="text-muted-foreground">Elo: <strong className="text-foreground">{getRatingForCategory(selectedTcObj.tag.toLowerCase())}</strong></span>
+                  )}
+                </div>
+
+                <Tabs defaultValue="rapid" className="w-full">
+                  <TabsList className="w-full justify-start bg-muted/40 p-1 rounded-xl">
+                    <TabsTrigger value="rapid" className="rounded-lg text-xs font-bold flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-emerald-500" /> Rapid
+                    </TabsTrigger>
+                    <TabsTrigger value="blitz" className="rounded-lg text-xs font-bold flex items-center gap-1">
+                      <Zap className="w-3.5 h-3.5 text-amber-500" /> Blitz
+                    </TabsTrigger>
+                    <TabsTrigger value="bullet" className="rounded-lg text-xs font-bold flex items-center gap-1">
+                      <Flame className="w-3.5 h-3.5 text-rose-500" /> Bullet
+                    </TabsTrigger>
+                    <TabsTrigger value="classical" className="rounded-lg text-xs font-bold flex items-center gap-1">
+                      <Trophy className="w-3.5 h-3.5 text-blue-500" /> Classical
+                    </TabsTrigger>
+                  </TabsList>
+
+                  {Object.entries(TIME_CONTROLS).map(([category, controls]) => (
+                    <TabsContent key={category} value={category} className="mt-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {controls.map((control) => {
+                          const isSelected = timeControl === control.id;
+                          return (
+                            <button
+                              key={control.id}
+                              type="button"
+                              onClick={() => setTimeControl(control.id)}
+                              className={`p-4 rounded-xl border text-center transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'border-primary bg-primary/10 font-bold shadow-sm'
+                                  : 'border-border/50 bg-muted/20 hover:bg-muted/40'
+                              }`}
+                            >
+                              <div className="text-lg font-extrabold">{control.name}</div>
+                              <div className="text-xs text-muted-foreground mt-0.5">{control.desc}</div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </TabsContent>
+                  ))}
+                </Tabs>
+              </div>
+
+              {/* ACTION BUTTON */}
+              <div className="pt-4 border-t border-border/40">
+                <Button 
+                  size="lg" 
+                  className="w-full h-12 text-base font-extrabold rounded-xl shadow-md"
+                  onClick={handleCreateGame} 
+                  disabled={createGame.isPending}
+                >
+                  {createGame.isPending ? (
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  ) : (
+                    <PlayIcon className="mr-2 h-5 w-5 fill-current" />
+                  )}
+                  {mode === 'online' && 'Play Online'}
+                  {mode === 'bot' && `Play vs ${selectedBotObj.name}`}
+                  {mode === 'local' && 'Play Local Match'}
+                </Button>
+              </div>
+            </div>
+          )}
+
+        </CardContent>
+      </Card>
     </div>
   );
 }
-
