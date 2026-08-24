@@ -155,7 +155,7 @@ export default function Friends() {
                   placeholder="Username..." 
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="rounded-xl text-xs"
+                  className="rounded-xl text-base sm:text-xs"
                 />
                 <Button 
                   type="submit" 
@@ -271,7 +271,7 @@ export default function Friends() {
                       placeholder="Filter friends..."
                       value={searchFriend}
                       onChange={(e) => setSearchFriend(e.target.value)}
-                      className="pl-8 h-8 rounded-lg text-xs"
+                      className="pl-8 h-8 rounded-lg text-base sm:text-xs"
                     />
                   </div>
                 )}
