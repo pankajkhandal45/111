@@ -24,7 +24,16 @@ const RANKS = ['8', '7', '6', '5', '4', '3', '2', '1'];
 
 const DEFAULT_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-export function ChessBoard({ fen, onMove, flipped = false, lastMove, disabled = false, rotateTopPieces = false, hintSquare = null, hintTargetSquare = null }: ChessBoardProps) {
+export function ChessBoard({ 
+  fen, 
+  onMove, 
+  flipped = false, 
+  lastMove, 
+  disabled = false, 
+  rotateTopPieces = false, 
+  hintSquare = null, 
+  hintTargetSquare = null 
+}: ChessBoardProps) {
   const [chess, setChess] = useState(() => {
     const c = new Chess();
     if (fen && fen.trim()) {
@@ -39,13 +48,12 @@ export function ChessBoard({ fen, onMove, flipped = false, lastMove, disabled = 
     try {
       const newChess = new Chess(safeFen);
       setChess(newChess);
-      // Clear selection on external board update
       setSelectedSquare(null);
       setValidMoves([]);
     } catch (e) {
       // Invalid FEN, keep current state
     }
-  }, [fen]); // Only re-run when fen prop changes, NOT when chess object changes
+  }, [fen]);
 
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [validMoves, setValidMoves] = useState<Move[]>([]);
@@ -126,7 +134,7 @@ export function ChessBoard({ fen, onMove, flipped = false, lastMove, disabled = 
   })();
 
   return (
-    <div className="relative w-full max-w-[600px] aspect-square rounded-sm overflow-hidden shadow-lg select-none touch-none">
+    <div className="relative w-full max-w-[600px] aspect-square rounded-xl overflow-hidden shadow-xl select-none touch-none border-2 border-border/60">
       <div className="absolute inset-0 grid grid-cols-8 grid-rows-8">
         {displayRanks.map((rank, rIdx) => 
           displayFiles.map((file, fIdx) => {
@@ -146,40 +154,40 @@ export function ChessBoard({ fen, onMove, flipped = false, lastMove, disabled = 
                 key={square}
                 onClick={() => handleSquareClick(square)}
                 className={cn(
-                  "relative flex items-center justify-center w-full h-full",
+                  "relative flex items-center justify-center w-full h-full transition-colors",
                   isDark ? "bg-[#5D7E5D] text-[#ECEED5]" : "bg-[#ECEED5] text-[#5D7E5D]",
-                  isLastMove && "after:absolute after:inset-0 after:bg-yellow-400/30",
-                  isSelected && "after:absolute after:inset-0 after:bg-yellow-400/50",
-                  isHintSource && "after:absolute after:inset-0 after:bg-amber-400/60 after:animate-pulse ring-4 ring-amber-400 z-30",
-                  isHintTarget && "after:absolute after:inset-0 after:bg-emerald-400/60 after:animate-pulse ring-4 ring-emerald-400 z-30",
-                  isKingInCheck && "bg-red-500 after:absolute after:inset-0 after:bg-red-500/50 after:shadow-[inset_0_0_20px_rgba(255,0,0,0.8)]"
+                  isLastMove && "bg-yellow-400/40 dark:bg-yellow-500/40",
+                  isSelected && "bg-yellow-400/70 dark:bg-yellow-500/70 shadow-inner",
+                  isHintSource && "!bg-amber-400 !text-black animate-pulse ring-4 ring-amber-500 z-10 font-bold",
+                  isHintTarget && "!bg-emerald-400 !text-black animate-pulse ring-4 ring-emerald-500 z-10 font-bold",
+                  isKingInCheck && "!bg-red-500 text-white animate-pulse"
                 )}
               >
                 {/* Coordinates */}
                 {fIdx === 0 && (
-                  <span className="absolute top-1 left-1 text-[10px] sm:text-xs font-semibold opacity-70">
+                  <span className="absolute top-1 left-1 text-[10px] sm:text-xs font-bold opacity-80 pointer-events-none">
                     {rank}
                   </span>
                 )}
                 {rIdx === 7 && (
-                  <span className="absolute bottom-0 right-1 text-[10px] sm:text-xs font-semibold opacity-70">
+                  <span className="absolute bottom-0.5 right-1 text-[10px] sm:text-xs font-bold opacity-80 pointer-events-none">
                     {file}
                   </span>
                 )}
 
                 {/* Valid Move Indicator */}
                 {isValidMove && !piece && (
-                  <div className="absolute w-1/3 h-1/3 rounded-full bg-black/20 z-10" />
+                  <div className="absolute w-1/3 h-1/3 rounded-full bg-black/25 z-10 pointer-events-none" />
                 )}
                 {isValidMove && piece && (
-                  <div className="absolute inset-0 border-[6px] border-black/20 rounded-full z-10" />
+                  <div className="absolute inset-0 border-[5px] border-black/30 rounded-full z-10 pointer-events-none" />
                 )}
 
                 {/* Piece */}
                 {piece && (
                   <div 
                     className={cn(
-                      "relative z-20 text-[2.5rem] sm:text-[4rem] leading-none filter drop-shadow-sm transition-transform duration-150 ease-in-out cursor-pointer",
+                      "relative z-20 text-[2.5rem] sm:text-[3.8rem] leading-none filter drop-shadow-sm transition-transform duration-150 ease-in-out cursor-pointer",
                       piece.color === 'w' ? "text-white" : "text-black",
                       "drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]",
                       rotateTopPieces && piece.color === (flipped ? 'w' : 'b') ? "rotate-180" : ""
@@ -196,8 +204,8 @@ export function ChessBoard({ fen, onMove, flipped = false, lastMove, disabled = 
 
       {/* Promotion Dialog Overlay */}
       {promotionMove && (
-        <div className="absolute inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-card p-4 rounded-lg shadow-2xl flex gap-2">
+        <div className="absolute inset-0 bg-black/60 z-50 flex items-center justify-center backdrop-blur-sm">
+          <div className="bg-card p-4 rounded-xl shadow-2xl flex gap-2 border border-border">
             {['q', 'r', 'b', 'n'].map(p => (
               <button
                 key={p}
@@ -205,7 +213,7 @@ export function ChessBoard({ fen, onMove, flipped = false, lastMove, disabled = 
                   e.stopPropagation();
                   handlePromotion(p);
                 }}
-                className="w-16 h-16 bg-muted hover:bg-accent rounded flex items-center justify-center text-4xl"
+                className="w-14 h-14 bg-muted hover:bg-accent rounded-lg flex items-center justify-center text-3xl transition-transform hover:scale-105"
               >
                 <span className={cn(
                   chess.turn() === 'w' ? "text-white" : "text-black",
@@ -221,7 +229,7 @@ export function ChessBoard({ fen, onMove, flipped = false, lastMove, disabled = 
                 setPromotionMove(null);
                 setSelectedSquare(null);
               }}
-              className="absolute top-2 right-2 text-muted-foreground hover:text-foreground"
+              className="absolute top-2 right-2 text-muted-foreground hover:text-foreground text-xl font-bold"
             >
               ×
             </button>
