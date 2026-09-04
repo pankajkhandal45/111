@@ -1,17 +1,38 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { usersTable, ratingsTable, gamesTable } from "@workspace/db";
+import { usersTable, ratingsTable, gamesTable, friendsTable } from "@workspace/db";
 import { eq, or, desc, and, like, ne, inArray } from "drizzle-orm";
+import { optionalAuth, type AuthRequest } from "../lib/auth";
 
 const router = Router();
 
-// GET /api/leaderboard
-router.get("/leaderboard", async (req, res) => {
+// GET /api/leaderboard (Friends Leaderboard)
+router.get("/leaderboard", optionalAuth, async (req: AuthRequest, res) => {
   try {
-    const timeControl = (req.query.timeControl as string) || "blitz";
+    const timeControl = (req.query.timeControl as string) || "rapid";
     const limit = Math.min(parseInt(req.query.limit as string || "50"), 100);
 
     const ratingField = timeControl as "bullet" | "blitz" | "rapid" | "classical";
+
+    // If user is not logged in, return empty list (frontend prompts login)
+    if (!req.userId) {
+      res.json([]);
+      return;
+    }
+
+    const currentUserId = req.userId;
+
+    // Fetch all friends for the current user
+    const friendRows = await db.select().from(friendsTable)
+      .where(or(eq(friendsTable.userId, currentUserId), eq(friendsTable.friendId, currentUserId)));
+
+    const friendIds = friendRows.map(f => f.userId === currentUserId ? f.friendId : f.userId);
+    const targetUserIds = Array.from(new Set([currentUserId, ...friendIds]));
+
+    if (targetUserIds.length === 0) {
+      res.json([]);
+      return;
+    }
 
     const users = await db.select({
       id: usersTable.id,
@@ -24,7 +45,7 @@ router.get("/leaderboard", async (req, res) => {
       classical: ratingsTable.classical,
     }).from(usersTable)
       .innerJoin(ratingsTable, eq(usersTable.id, ratingsTable.userId))
-      .where(eq(usersTable.isGuest, false))
+      .where(inArray(usersTable.id, targetUserIds))
       .orderBy(desc(ratingsTable[ratingField]))
       .limit(limit);
 
@@ -35,7 +56,7 @@ router.get("/leaderboard", async (req, res) => {
 
     const userIds = users.map(u => u.id);
 
-    // Fetch all finished games for all users in a SINGLE bulk query
+    // Fetch all finished games for target users in a SINGLE bulk query
     const finishedGames = await db.select({
       whitePlayerId: gamesTable.whitePlayerId,
       blackPlayerId: gamesTable.blackPlayerId,
@@ -88,7 +109,7 @@ router.get("/leaderboard", async (req, res) => {
         username: u.username,
         avatar: u.avatar ?? null,
         country: u.country ?? null,
-        rating: u[ratingField] as number,
+        rating: (u[ratingField] as number) ?? 800,
         wins: stats.wins,
         losses: stats.losses,
         draws: stats.draws,
@@ -97,14 +118,14 @@ router.get("/leaderboard", async (req, res) => {
       };
     });
 
-    // Sort primarily by winRate desc, then wins desc, then rating desc
+    // Sort primarily by rating desc, then winRate desc, then wins desc
     rawEntries.sort((a, b) => {
+      if (b.rating !== a.rating) return b.rating - a.rating;
       if (b.winRate !== a.winRate) return b.winRate - a.winRate;
-      if (b.wins !== a.wins) return b.wins - a.wins;
-      return b.rating - a.rating;
+      return b.wins - a.wins;
     });
 
-    // Assign ranks based on win rate order
+    // Assign ranks based on sorted order
     const entries = rawEntries.map((entry, index) => ({
       rank: index + 1,
       ...entry,

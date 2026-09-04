@@ -7,57 +7,84 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Link } from 'wouter';
-import { Trophy, Search, Crown, Flame, Zap, Clock } from 'lucide-react';
+import { Trophy, Search, Crown, Flame, Zap, Clock, Users, UserPlus, LogIn, Sparkles } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 export default function Leaderboard() {
   const [activeTab, setActiveTab] = useState<'bullet' | 'blitz' | 'rapid' | 'classical'>('rapid');
   const [searchQuery, setSearchQuery] = useState('');
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
 
   return (
     <div className="max-w-5xl mx-auto py-4 sm:py-8 px-2 sm:px-4 space-y-5 sm:space-y-8 w-full overflow-hidden">
       {/* ── Page Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="space-y-1">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-500 text-xs font-semibold">
-            <Crown className="w-3.5 h-3.5" /> Hall of Fame
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+            <Users className="w-3.5 h-3.5" /> Friends Circle
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Global Leaderboard</h1>
-          <p className="text-xs text-muted-foreground">Top ranked chess players across all time controls</p>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Friends Leaderboard</h1>
+          <p className="text-xs text-muted-foreground">Rankings and standings among you and your chess friends</p>
         </div>
 
         {/* Live Search Input - text-base on mobile prevents auto viewport zoom */}
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            placeholder="Search player..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 h-9 sm:h-10 rounded-xl text-base sm:text-xs bg-card/60"
-          />
-        </div>
+        {user && (
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search friend..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 h-9 sm:h-10 rounded-xl text-base sm:text-xs bg-card/60"
+            />
+          </div>
+        )}
       </div>
 
-      {/* ── Category Tabs ── */}
-      <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)} className="w-full space-y-4 sm:space-y-6">
-        <TabsList className="grid grid-cols-4 w-full bg-muted/40 p-1 rounded-xl sm:rounded-2xl border border-border/50">
-          <TabsTrigger value="rapid" className="rounded-lg sm:rounded-xl font-bold text-[11px] sm:text-xs flex items-center justify-center gap-1 sm:gap-2 py-1.5 sm:py-2 px-1">
-            <Clock className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" /> <span className="truncate">Rapid</span>
-          </TabsTrigger>
-          <TabsTrigger value="blitz" className="rounded-lg sm:rounded-xl font-bold text-[11px] sm:text-xs flex items-center justify-center gap-1 sm:gap-2 py-1.5 sm:py-2 px-1">
-            <Zap className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" /> <span className="truncate">Blitz</span>
-          </TabsTrigger>
-          <TabsTrigger value="bullet" className="rounded-lg sm:rounded-xl font-bold text-[11px] sm:text-xs flex items-center justify-center gap-1 sm:gap-2 py-1.5 sm:py-2 px-1">
-            <Flame className="w-3.5 h-3.5 text-rose-500 flex-shrink-0" /> <span className="truncate">Bullet</span>
-          </TabsTrigger>
-          <TabsTrigger value="classical" className="rounded-lg sm:rounded-xl font-bold text-[11px] sm:text-xs flex items-center justify-center gap-1 sm:gap-2 py-1.5 sm:py-2 px-1">
-            <Trophy className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" /> <span className="truncate">Classical</span>
-          </TabsTrigger>
-        </TabsList>
+      {/* ── If Not Logged In ── */}
+      {!authLoading && !user ? (
+        <Card className="border-border/60 bg-gradient-to-b from-card to-muted/20 p-8 text-center space-y-6 rounded-2xl shadow-sm">
+          <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto shadow-inner">
+            <Trophy className="w-8 h-8" />
+          </div>
+          <div className="space-y-2 max-w-md mx-auto">
+            <h2 className="text-xl font-extrabold tracking-tight">Sign in to see Friends Leaderboard</h2>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Connect with your friends, challenge each other to games, and climb the personal rankings together!
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <Button asChild size="default" className="font-bold rounded-xl px-6">
+              <Link href="/login">
+                <LogIn className="w-4 h-4 mr-2" /> Log In
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="default" className="font-bold rounded-xl px-6">
+              <Link href="/register">Create Account</Link>
+            </Button>
+          </div>
+        </Card>
+      ) : (
+        /* ── Category Tabs ── */
+        <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as any)} className="w-full space-y-4 sm:space-y-6">
+          <TabsList className="grid grid-cols-4 w-full bg-muted/40 p-1 rounded-xl sm:rounded-2xl border border-border/50">
+            <TabsTrigger value="rapid" className="rounded-lg sm:rounded-xl font-bold text-[11px] sm:text-xs flex items-center justify-center gap-1 sm:gap-2 py-1.5 sm:py-2 px-1">
+              <Clock className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" /> <span className="truncate">Rapid</span>
+            </TabsTrigger>
+            <TabsTrigger value="blitz" className="rounded-lg sm:rounded-xl font-bold text-[11px] sm:text-xs flex items-center justify-center gap-1 sm:gap-2 py-1.5 sm:py-2 px-1">
+              <Zap className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" /> <span className="truncate">Blitz</span>
+            </TabsTrigger>
+            <TabsTrigger value="bullet" className="rounded-lg sm:rounded-xl font-bold text-[11px] sm:text-xs flex items-center justify-center gap-1 sm:gap-2 py-1.5 sm:py-2 px-1">
+              <Flame className="w-3.5 h-3.5 text-rose-500 flex-shrink-0" /> <span className="truncate">Bullet</span>
+            </TabsTrigger>
+            <TabsTrigger value="classical" className="rounded-lg sm:rounded-xl font-bold text-[11px] sm:text-xs flex items-center justify-center gap-1 sm:gap-2 py-1.5 sm:py-2 px-1">
+              <Trophy className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" /> <span className="truncate">Classical</span>
+            </TabsTrigger>
+          </TabsList>
 
-        <LeaderboardView timeControl={activeTab} searchQuery={searchQuery} currentUser={user} />
-      </Tabs>
+          <LeaderboardView timeControl={activeTab} searchQuery={searchQuery} currentUser={user} />
+        </Tabs>
+      )}
     </div>
   );
 }
@@ -99,6 +126,8 @@ function LeaderboardView({
     return leaderboard.find(e => e.userId === currentUser.id);
   }, [currentUser, leaderboard]);
 
+  const totalFriendsInBoard = (leaderboard?.length || 1) - 1;
+
   if (isLoading && !leaderboard) {
     return (
       <div className="space-y-4">
@@ -110,7 +139,32 @@ function LeaderboardView({
 
   return (
     <div className="space-y-4 sm:space-y-6 w-full">
-      {/* ── Top 3 Winners Podium (Responsive Layout) ── */}
+      {/* ── Empty Friends Prompt Banner ── */}
+      {leaderboard && leaderboard.length <= 1 && (
+        <Card className="border-primary/20 bg-primary/5 p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center gap-3 text-center sm:text-left">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+              <UserPlus className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="font-extrabold text-sm flex items-center gap-1.5 justify-center sm:justify-start">
+                <span>Add friends to build your leaderboard!</span>
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Challenge fellow players to matches and see how you stack up in real-time.
+              </p>
+            </div>
+          </div>
+          <Button asChild size="sm" className="font-bold rounded-xl flex-shrink-0">
+            <Link href="/friends">
+              <UserPlus className="w-3.5 h-3.5 mr-1.5" /> Find Friends
+            </Link>
+          </Button>
+        </Card>
+      )}
+
+      {/* ── Top Winners Podium (When >= 3 entries) ── */}
       {!searchQuery && topThree.length === 3 && (
         <div className="grid grid-cols-3 gap-2 sm:gap-6 pt-2 sm:pt-4 items-end max-w-xl mx-auto w-full">
           {/* 2nd Place (Silver) */}
@@ -126,7 +180,10 @@ function LeaderboardView({
                 </span>
               </div>
               <div className="text-center w-full px-0.5">
-                <div className="font-extrabold text-[11px] sm:text-xs truncate max-w-[75px] sm:max-w-[110px] mx-auto group-hover:text-primary transition-colors">{topThree[0].username}</div>
+                <div className="font-extrabold text-[11px] sm:text-xs truncate max-w-[75px] sm:max-w-[110px] mx-auto group-hover:text-primary transition-colors">
+                  {topThree[0].username}
+                  {currentUser?.id === topThree[0].userId && <span className="text-[9px] text-primary ml-1">(You)</span>}
+                </div>
                 <div className="text-[10px] sm:text-xs font-mono font-bold text-slate-400">{topThree[0].rating}</div>
               </div>
             </Link>
@@ -149,7 +206,10 @@ function LeaderboardView({
                 </span>
               </div>
               <div className="text-center w-full px-0.5">
-                <div className="font-extrabold text-xs sm:text-sm truncate max-w-[90px] sm:max-w-[130px] mx-auto group-hover:text-primary transition-colors">{topThree[1].username}</div>
+                <div className="font-extrabold text-xs sm:text-sm truncate max-w-[90px] sm:max-w-[130px] mx-auto group-hover:text-primary transition-colors">
+                  {topThree[1].username}
+                  {currentUser?.id === topThree[1].userId && <span className="text-[10px] text-primary ml-1">(You)</span>}
+                </div>
                 <div className="text-xs sm:text-sm font-mono font-black text-amber-400">{topThree[1].rating}</div>
               </div>
             </Link>
@@ -171,7 +231,10 @@ function LeaderboardView({
                 </span>
               </div>
               <div className="text-center w-full px-0.5">
-                <div className="font-extrabold text-[11px] sm:text-xs truncate max-w-[75px] sm:max-w-[110px] mx-auto group-hover:text-primary transition-colors">{topThree[2].username}</div>
+                <div className="font-extrabold text-[11px] sm:text-xs truncate max-w-[75px] sm:max-w-[110px] mx-auto group-hover:text-primary transition-colors">
+                  {topThree[2].username}
+                  {currentUser?.id === topThree[2].userId && <span className="text-[9px] text-primary ml-1">(You)</span>}
+                </div>
                 <div className="text-[10px] sm:text-xs font-mono font-bold text-amber-600">{topThree[2].rating}</div>
               </div>
             </Link>
@@ -190,17 +253,25 @@ function LeaderboardView({
               #{userRankEntry.rank}
             </Badge>
             <div>
-              <div className="font-extrabold text-xs sm:text-sm">Your Standing</div>
-              <div className="text-[11px] sm:text-xs text-muted-foreground">Rating: <strong className="text-foreground">{userRankEntry.rating} Elo</strong> • Win Rate: <strong className="text-foreground">{userRankEntry.winRate}%</strong></div>
+              <div className="font-extrabold text-xs sm:text-sm">Your Standing among Friends</div>
+              <div className="text-[11px] sm:text-xs text-muted-foreground">
+                Rating: <strong className="text-foreground">{userRankEntry.rating} Elo</strong> • Win Rate: <strong className="text-foreground">{userRankEntry.winRate}%</strong>
+                {totalFriendsInBoard > 0 && <span> • <strong>{totalFriendsInBoard}</strong> friend{totalFriendsInBoard !== 1 ? 's' : ''} in circle</span>}
+              </div>
             </div>
           </div>
-          <Button asChild size="sm" variant="outline" className="text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-xl h-8 px-2.5 sm:px-3">
-            <Link href={`/profile/${currentUser.username}`}>Profile</Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild size="sm" variant="outline" className="text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-xl h-8 px-2.5 sm:px-3">
+              <Link href="/friends">Friends</Link>
+            </Button>
+            <Button asChild size="sm" variant="default" className="text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-xl h-8 px-2.5 sm:px-3">
+              <Link href={`/profile/${currentUser.username}`}>Profile</Link>
+            </Button>
+          </div>
         </Card>
       )}
 
-      {/* ── Leaderboard Table Container (Horizontal Scroll Isolated) ── */}
+      {/* ── Leaderboard Table Container ── */}
       <Card className="border-border/50 shadow-sm rounded-xl sm:rounded-2xl overflow-hidden w-full">
         <CardContent className="p-0">
           <div className="overflow-x-auto w-full max-w-full">
@@ -266,7 +337,7 @@ function LeaderboardView({
                 {filteredEntries.length === 0 && (
                   <tr>
                     <td colSpan={5} className="px-4 py-8 sm:py-12 text-center text-muted-foreground text-xs">
-                      No players found for &quot;{searchQuery}&quot;
+                      {searchQuery ? `No friend found matching "${searchQuery}"` : "No players in your friends leaderboard yet"}
                     </td>
                   </tr>
                 )}
@@ -278,3 +349,4 @@ function LeaderboardView({
     </div>
   );
 }
+

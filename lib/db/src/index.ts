@@ -1,5 +1,7 @@
 import { drizzle } from "drizzle-orm/libsql";
 import { createClient } from "@libsql/client";
+import path from "path";
+import { existsSync } from "fs";
 import * as schema from "./schema";
 import * as relations from "./relations";
 
@@ -7,7 +9,23 @@ import * as relations from "./relations";
 // Fall back to local SQLite file if it's a PostgreSQL URL (env misconfiguration).
 const rawUrl = process.env.DATABASE_URL ?? "";
 const isLibsqlUrl = rawUrl.startsWith("file:") || rawUrl.startsWith("libsql:") || rawUrl.startsWith("https://");
-const dbPath = isLibsqlUrl ? rawUrl : "file:../../sqlite.db";
+
+function resolveLocalDbUrl(): string {
+  if (isLibsqlUrl) return rawUrl;
+  const candidates = [
+    path.resolve(process.cwd(), "sqlite.db"),
+    path.resolve(process.cwd(), "../../sqlite.db"),
+    path.resolve(process.cwd(), "lib/db/sqlite.db"),
+  ];
+  for (const c of candidates) {
+    if (existsSync(c)) {
+      return `file:${c.replace(/\\/g, "/")}`;
+    }
+  }
+  return "file:sqlite.db";
+}
+
+const dbPath = resolveLocalDbUrl();
 
 const client = createClient({ 
   url: dbPath,
@@ -17,3 +35,4 @@ export const db = drizzle(client, { schema: { ...schema, ...relations } });
 
 export * from "./schema";
 export * from "./relations";
+
